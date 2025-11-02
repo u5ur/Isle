@@ -33,7 +33,7 @@ typedef Isle::Application* (*CreateApplicationFn)();
 int main()
 {
 #ifdef _DEBUG
-    const char* dllName =
+    const char* Dll_Name =
 #ifdef _WIN32
         "IsleGame_Debug.dll";
 #else
@@ -48,8 +48,8 @@ int main()
 #endif
 #endif
 
-    LOAD_LIBRARY(gameLib, dllName);
-    LOAD_FUNCTION(CreateApplication, gameLib, CreateApplication, CreateApplicationFn);
+    LOAD_LIBRARY(Game_Handle, Dll_Name);
+    LOAD_FUNCTION(CreateApplication, Game_Handle, CreateApplication, CreateApplicationFn);
 
     Isle::Application* Application = CreateApplication();
     Application->Start();
@@ -60,6 +60,6 @@ int main()
     }
 
     Application->Destroy();
-    DYNLIB_FREE(gameLib);
+    DYNLIB_FREE(Game_Handle);
     return 0;
 }
