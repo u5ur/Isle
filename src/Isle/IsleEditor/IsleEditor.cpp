@@ -1,12 +1,11 @@
 ﻿#pragma once
+#include <windows.h>
 #include <IsleEngine.h>
 #include <IsleGame.h>
 
 #if !defined(_WIN32)
 #error "IsleDynamic is currently only supported on Windows."
 #endif
-
-#include <windows.h>
 
 #define DYNLIB_HANDLE       HMODULE
 #define DYNLIB_LOAD(path)   LoadLibraryA(path)
@@ -33,19 +32,9 @@ typedef Isle::Application* (*CreateApplicationFn)();
 int main()
 {
 #ifdef _DEBUG
-    const char* Dll_Name =
-#ifdef _WIN32
-        "IsleGame_Debug.dll";
+    const char* Dll_Name = "IsleGame_Debug.dll";
 #else
-        "libIsleGame_Debug.so";
-#endif
-#else
-    const char* dllName =
-#ifdef _WIN32
-        "IsleGame.dll";
-#else
-        "libIsleGame.so";
-#endif
+    const char* Dll_Name = "IsleGame.dll";
 #endif
 
     LOAD_LIBRARY(Game_Handle, Dll_Name);

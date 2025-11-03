@@ -1,7 +1,6 @@
-//Window.h
-
+// Window.h
 #pragma once
-#include "../../Common/Common.h"
+#include <Core/Common/Common.h>
 
 namespace Isle
 {

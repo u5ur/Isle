@@ -109,3 +109,16 @@ inline bool HasAnsiSupport()
 #define ISLE_WARN(format, ...)    ((void)0)
 #define ISLE_SUCCESS(format, ...) ((void)0)
 #endif
+
+
+#define READ_FILE(path, outStr)                            \
+    do {                                                   \
+        std::ifstream _file(path);                         \
+        if (!_file.is_open()) {                            \
+            outStr = "";                                   \
+        } else {                                           \
+            std::stringstream _ss;                         \
+            _ss << _file.rdbuf();                          \
+            outStr = _ss.str();                            \
+        }                                                  \
+    } while (0)
