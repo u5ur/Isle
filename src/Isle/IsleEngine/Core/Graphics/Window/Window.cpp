@@ -3,9 +3,9 @@
 
 namespace Isle
 {
-	static const int MAJOR_VERSION = 4;
-	static const int MINOR_VERSION = 6;
-	static const char* WINDOW_TITLE = "Isle";
+	static constexpr int MAJOR_VERSION = 4;
+	static constexpr int MINOR_VERSION = 6;
+	static const auto WINDOW_TITLE = "Isle";
 
 	void Window::Start()
 	{

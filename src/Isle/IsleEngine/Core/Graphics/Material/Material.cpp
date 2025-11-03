@@ -1,5 +1,6 @@
 #include "Material.h"
 #include "../Shader/Shader.h"
+#include "Core/Graphics/Texture/Texture.h"
 
 namespace Isle
 {
@@ -15,6 +16,23 @@ namespace Isle
     {
         if (m_Shader)
             m_Shader->Bind();
+    }
+
+    GpuMaterial Material::GetGpuMaterial()
+    {
+        GpuMaterial GMaterial{};
+        GMaterial.m_BaseColor_TexIndex = GetTexture("BaseColor")->m_BindlessIndex;
+        GMaterial.m_Emissive_TexIndex = GetTexture("Emissive")->m_BindlessIndex;
+        GMaterial.m_MetallicRoughness_TexIndex = GetTexture("MetallicRoughness")->m_BindlessIndex;
+        GMaterial.m_Occlusion_TexIndex = GetTexture("m_Occlusion")->m_BindlessIndex;
+        GMaterial.m_NormalScale = m_NormalScale;
+        GMaterial.m_OcclusionStrength = m_OcclusionStrength;
+        GMaterial.m_MetallicFactor = m_MetallicFactor;
+        GMaterial.m_EmissiveFactor = m_EmissiveFactor;
+        GMaterial.m_BaseColorFactor = m_BaseColorFactor;
+        GMaterial.m_RoughnessFactor = m_RoughnessFactor;
+        GMaterial.m_IOR = m_IOR;
+        return GMaterial;
     }
 
     Texture* Material::GetTexture(std::string name)

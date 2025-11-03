@@ -8,6 +8,7 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include <mutex>
 
@@ -31,6 +32,9 @@
 #include "Memory/WeakRef.h"
 #include "Component/Component.h"
 #include "Singleton/Singleton.h"
+#include "Transform/Transform.h"
+#include "Bounds/Bounds.h"
+#include "SceneComponent/SceneComponent.h"
 
 #define ISLE_OBJECT_CLASS(ClassName) \
     friend class Isle::Object; \

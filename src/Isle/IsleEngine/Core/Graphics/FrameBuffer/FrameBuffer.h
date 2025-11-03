@@ -1,11 +1,11 @@
 // FrameBuffer.h
 #pragma once
 #include <Core/Common/Common.h>
+#include <Core/Graphics/GfxResource/GfxResource.h>
+#include <Core/Graphics/Texture/Texture.h>
 
 namespace Isle
 {
-    class Texture;
-
     enum class RENDER_TARGET_TYPE
     {
         NONE = 0,
@@ -26,21 +26,46 @@ namespace Isle
         FINAL
     };
 
-	class FrameBuffer : public Component
-	{
-	public:
+    class FrameBuffer : public GfxResource
+    {
+    public:
+        GLuint m_Id = 0;
         int m_Width;
         int m_Height;
-
         std::map<RENDER_TARGET_TYPE, Texture*> m_Attachments;
         std::vector<GLenum> m_DrawBuffers;
 
     public:
         FrameBuffer(int width, int height);
-        ~FrameBuffer();
+        ~FrameBuffer() override;
 
-        virtual void Start() override;
-        virtual void Update() override;
-        virtual void Destroy() override;
-	};
+        void Create();
+        void Destroy();
+
+        void Load() override;
+        void Unload() override { Destroy(); }
+        void Bind(uint32_t slot = 0) override;
+        void Unbind(uint32_t slot = 0) override;
+
+        Texture* AddAttachment(RENDER_TARGET_TYPE type, TEXTURE_FORMAT format = TEXTURE_FORMAT::RGBA16F, bool generateMipmaps = false);
+        void AttachTexture(RENDER_TARGET_TYPE type, Texture* texture, int attachmentIndex = 0);
+        void AttachDepthTexture(Texture* texture);
+        void AttachDepthStencilTexture(Texture* texture);
+
+        Texture* GetAttachment(RENDER_TARGET_TYPE type);
+        void SetDrawBuffers(const std::vector<RENDER_TARGET_TYPE>& targets);
+
+        bool CheckStatus();
+        void Clear(const glm::vec4& color = glm::vec4(0.0f), float depth = 1.0f, int stencil = 0);
+        void ClearColor(const glm::vec4& color = glm::vec4(0.0f));
+        void ClearDepth(float depth = 1.0f);
+
+        void Resize(int width, int height);
+        void BlitTo(FrameBuffer* target, GLbitfield mask = GL_COLOR_BUFFER_BIT,
+                   GLenum filter = GL_NEAREST);
+
+        void SetDebugLabel(const std::string& name);
+
+        static GLenum ResolveAttachment(RENDER_TARGET_TYPE type, int index = 0);
+    };
 }

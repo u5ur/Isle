@@ -16,7 +16,7 @@ namespace Isle
 {
     class Application : public Singleton<Application>, public Component
     {
-        ISLE_OBJECT_CLASS(Application);
+        ISLE_OBJECT_CLASS(Application)
 
     public:
         Window* m_Window;

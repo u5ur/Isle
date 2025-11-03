@@ -1,6 +1,7 @@
 // Material.h
 #pragma once
 #include <Core/Common/Common.h>
+#include <Core/Graphics/Structs/GpuStructs.h>
 
 namespace Isle
 {
@@ -32,6 +33,8 @@ namespace Isle
         Material();
 
         void Bind();
+        GpuMaterial GetGpuMaterial();
+
         Texture* GetTexture(std::string name);
         void SetTexture(std::string name, Texture* texture);
 
