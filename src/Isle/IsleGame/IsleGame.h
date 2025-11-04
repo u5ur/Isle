@@ -1,3 +1,4 @@
+// IsleGame.h
 #pragma once
 
 #ifdef _WIN32
@@ -17,9 +18,8 @@ namespace Isle
     class Application : public Singleton<Application>, public Component
     {
         ISLE_OBJECT_CLASS(Application)
-
     public:
-        Window* m_Window;
+        float m_DeltaTime;
 
     public:
         virtual void Start() override;

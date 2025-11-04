@@ -9,12 +9,14 @@ namespace Isle
 {
     class Pass : public Component
     {
-    protected:
+    public:
         Shader* m_Shader = nullptr;
         FrameBuffer* m_FrameBuffer = nullptr;
         PipelineState* m_PipelineState = nullptr;
 
     public:
+        void BlitToScreen();
+
         virtual void Bind();
         virtual void Unbind();
         virtual void Start() override;

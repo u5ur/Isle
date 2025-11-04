@@ -60,7 +60,7 @@ namespace Isle
         GfxBuffer() = default;
         ~GfxBuffer() override;
 
-        GfxBuffer(GFX_BUFFER_TYPE type, GLsizeiptr size, const void* data = nullptr,
+        GfxBuffer(GFX_BUFFER_TYPE type, GLsizeiptr size = 0, const void* data = nullptr,
             GFX_BUFFER_USAGE usage = GFX_BUFFER_USAGE::STATIC)
         {
             Create(type, size, data, usage);
@@ -111,56 +111,49 @@ namespace Isle
         template<typename T>
         size_t Add(const T& element)
         {
-            if (m_Type != GFX_BUFFER_TYPE::STORAGE)
+            if (m_Type != GFX_BUFFER_TYPE::STORAGE &&
+                m_Type != GFX_BUFFER_TYPE::INDIRECT_DRAW &&
+                m_Type != GFX_BUFFER_TYPE::INDIRECT_DISPATCH)
             {
-                ISLE_WARN("GfxBuffer::Add() called on non-storage buffer");
+                ISLE_WARN("GfxBuffer::Add() called on unsupported buffer type\n");
                 return 0;
             }
 
-            size_t offset = m_LocalData.size();
+            size_t currentElements = m_LocalData.size() / sizeof(T);
             size_t bytes = sizeof(T);
 
             const uint8_t* src = reinterpret_cast<const uint8_t*>(&element);
             m_LocalData.insert(m_LocalData.end(), src, src + bytes);
 
-            if (m_Id)
-            {
-                glBindBuffer(m_Target, m_Id);
-                glBufferData(m_Target, m_LocalData.size(), m_LocalData.data(), m_UsageHint);
-                glBindBuffer(m_Target, 0);
-            }
-
-            m_Dirty = false;
+            m_Dirty = true;
             m_SizeInBytes = m_LocalData.size();
-            return offset;
+
+            return currentElements;
         }
 
         template<typename T>
         size_t AddRange(const std::vector<T>& elements)
         {
-            if (m_Type != GFX_BUFFER_TYPE::STORAGE)
+            if (m_Type != GFX_BUFFER_TYPE::STORAGE &&
+                m_Type != GFX_BUFFER_TYPE::INDIRECT_DRAW &&
+                m_Type != GFX_BUFFER_TYPE::INDIRECT_DISPATCH)
             {
-                ISLE_WARN("GfxBuffer::AddRange() called on non-storage buffer");
+                ISLE_WARN("GfxBuffer::AddRange() called on unsupported buffer type\n");
                 return 0;
             }
 
-            size_t offset = m_LocalData.size();
+            size_t currentElements = m_LocalData.size() / sizeof(T);
             size_t bytes = elements.size() * sizeof(T);
 
             const uint8_t* src = reinterpret_cast<const uint8_t*>(elements.data());
             m_LocalData.insert(m_LocalData.end(), src, src + bytes);
 
-            if (m_Id)
-            {
-                glBindBuffer(m_Target, m_Id);
-                glBufferData(m_Target, m_LocalData.size(), m_LocalData.data(), m_UsageHint);
-                glBindBuffer(m_Target, 0);
-            }
-
-            m_Dirty = false;
+            m_Dirty = true;
             m_SizeInBytes = m_LocalData.size();
-            return offset;
+
+            return currentElements;
         }
+
 
 
         void SetDebugLabel(const std::string& name);

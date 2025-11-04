@@ -22,4 +22,12 @@ namespace Isle
     void Pass::Unbind()
     {
     }
+
+    void Pass::BlitToScreen()
+    {
+        if (m_FrameBuffer)
+        {
+            m_FrameBuffer->BlitTo(nullptr, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
+    }
 }

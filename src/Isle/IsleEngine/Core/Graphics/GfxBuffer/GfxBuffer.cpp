@@ -14,25 +14,28 @@ namespace Isle
         m_Target = ResolveTarget(type);
         m_UsageHint = ResolveUsage(usage);
 
-        if (!m_Id)
-            glGenBuffers(1, &m_Id);
-
         if (type == GFX_BUFFER_TYPE::VERTEX && !m_VAO)
         {
             glGenVertexArrays(1, &m_VAO);
         }
 
-        m_LocalData.resize(size);
-        if (data)
-            std::memcpy(m_LocalData.data(), data, size);
+        if (!m_Id)
+            glGenBuffers(1, &m_Id);
 
-        glBindBuffer(m_Target, m_Id);
-        glBufferData(m_Target, size, m_LocalData.data(), m_UsageHint);
-        glBindBuffer(m_Target, 0);
+        if (size > 0)
+        {
+            m_LocalData.resize(size);
+            if (data)
+                std::memcpy(m_LocalData.data(), data, size);
+
+            glBindBuffer(m_Target, m_Id);
+            glBufferData(m_Target, size, m_LocalData.data(), m_UsageHint);
+            glBindBuffer(m_Target, 0);
+            m_SizeInBytes = static_cast<size_t>(size);
+        }
 
         m_IsLoaded = true;
         m_Dirty = false;
-        m_SizeInBytes = static_cast<size_t>(size);
     }
 
     void GfxBuffer::Destroy()
@@ -214,9 +217,6 @@ namespace Isle
         if (m_Type != GFX_BUFFER_TYPE::VERTEX || !m_VAO)
             return;
 
-        if (indexBuffer && indexBuffer->GetType() != GFX_BUFFER_TYPE::INDEX)
-            return;
-
         m_AssociatedIndexBuffer = indexBuffer;
 
         if (m_AssociatedIndexBuffer)
@@ -229,13 +229,24 @@ namespace Isle
 
     void GfxBuffer::Upload()
     {
-        if (!m_Id || m_LocalData.empty() || !m_Dirty)
+        if (!m_Id || m_LocalData.empty())
             return;
 
         glBindBuffer(m_Target, m_Id);
-        glBufferSubData(m_Target, 0, m_LocalData.size(), m_LocalData.data());
-        glBindBuffer(m_Target, 0);
 
+        GLint currentSize = 0;
+        glGetBufferParameteriv(m_Target, GL_BUFFER_SIZE, &currentSize);
+
+        if (currentSize == 0 || m_LocalData.size() > static_cast<size_t>(currentSize))
+        {
+            glBufferData(m_Target, m_LocalData.size(), m_LocalData.data(), m_UsageHint);
+        }
+        else
+        {
+            glBufferSubData(m_Target, 0, m_LocalData.size(), m_LocalData.data());
+        }
+
+        glBindBuffer(m_Target, 0);
         m_Dirty = false;
     }
 

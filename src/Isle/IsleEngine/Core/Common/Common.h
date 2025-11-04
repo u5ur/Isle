@@ -1,4 +1,7 @@
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL
+#define NOMINMAX
+#define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <cstdio>
 #include <iostream>
@@ -12,8 +15,6 @@
 #include <functional>
 #include <mutex>
 
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -26,6 +27,13 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/quaternion.hpp>
+
+#include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
+#include <imgui/imgui_impl_win32.h>
+#include <imgui/imgui_impl_opengl3.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/ImGuizmo.h>
 
 #include "Object/Object.h"
 #include "Memory/Ref.h"

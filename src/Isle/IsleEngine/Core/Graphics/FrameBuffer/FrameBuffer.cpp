@@ -44,8 +44,8 @@ namespace Isle
 
     void FrameBuffer::Bind(uint32_t)
     {
-        if (!m_Id) return;
         glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
+        glViewport(0, 0, m_Width, m_Height);
         m_IsResident = true;
     }
 
@@ -157,7 +157,6 @@ namespace Isle
         glClearDepth(depth);
         glClearStencil(stencil);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void FrameBuffer::ClearColor(const glm::vec4& color)

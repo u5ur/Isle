@@ -14,7 +14,7 @@ namespace Isle
 
     class Pipeline : public Component
     {
-    public:
+    private:
         GfxBuffer* m_VertexBuffer;
         GfxBuffer* m_IndexBuffer;
         GfxBuffer* m_MaterialBuffer;
@@ -40,5 +40,10 @@ namespace Isle
         void SetCamera(Camera* camera);
 
         void AddDrawCommand(Mesh* mesh);
+
+        GfxBuffer* GetVertexBuffer() { return m_VertexBuffer; }
+        GfxBuffer* GetIndexBuffer() { return m_IndexBuffer; }
+        GfxBuffer* GetStaticMeshBuffer() { return m_StaticMeshBuffer; }
+        GfxBuffer* GetDrawCommandBuffer() { return m_DrawCommandBuffer; }
     };
 }

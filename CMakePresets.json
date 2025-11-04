@@ -1,71 +1,81 @@
 {
-    "version": 3,
-    "cmakeMinimumRequired": {
-        "major": 3,
-        "minor": 16
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16
+  },
+  "configurePresets": [
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/bin/${presetName}",
+      "installDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/toolchain/ninja.exe",
+        "CMAKE_C_COMPILER": "${sourceDir}/toolchain/clang.exe",
+        "CMAKE_CXX_COMPILER": "${sourceDir}/toolchain/clang++.exe",
+        "CMAKE_LINKER": "${sourceDir}/toolchain/lld-link.exe",
+        "CMAKE_AR": "${sourceDir}/toolchain/llvm-ar.exe",
+        "CMAKE_RANLIB": "${sourceDir}/toolchain/llvm-ranlib.exe",
+        "CMAKE_RC_COMPILER": "${sourceDir}/toolchain/llvm-rc.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_C_FLAGS": "-msse -msse2 -mavx",
+        "CMAKE_CXX_FLAGS": "-msse -msse2 -mavx",
+        "CMAKE_EXE_LINKER_FLAGS": "-defaultlib:msvcrt",
+        "CMAKE_SHARED_LINKER_FLAGS": "-defaultlib:msvcrt",
+        "CMAKE_MODULE_LINKER_FLAGS": "-defaultlib:msvcrt"
+      },
+      "environment": {
+        "PATH": "$env{PATH};C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.40.33807/bin/Hostx64/x64"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
-    "configurePresets": [
-        {
-            "name": "windows-base",
-            "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/bin/${presetName}",
-            "installDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_MAKE_PROGRAM": "${sourceDir}/toolchain/ninja.exe",
-                "CMAKE_C_COMPILER": "${sourceDir}/toolchain/clang.exe",
-                "CMAKE_CXX_COMPILER": "${sourceDir}/toolchain/clang++.exe",
-                "CMAKE_LINKER": "${sourceDir}/toolchain/lld-link.exe",
-                "CMAKE_AR": "${sourceDir}/toolchain/llvm-ar.exe",
-                "CMAKE_RANLIB": "${sourceDir}/toolchain/llvm-ranlib.exe",
-                "CMAKE_RC_COMPILER": "${sourceDir}/toolchain/llvm-rc.exe",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": true
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
-            "name": "x64-debug",
-            "displayName": "x64 Debug",
-            "inherits": "windows-base",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "x64-release",
-            "displayName": "x64 Release",
-            "inherits": "windows-base",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "build-debug",
-            "configurePreset": "x64-debug",
-            "displayName": "Build Debug",
-            "description": "Build all targets in Debug mode",
-            "configuration": "Debug"
-        },
-        {
-            "name": "build-release",
-            "configurePreset": "x64-release",
-            "displayName": "Build Release",
-            "description": "Build all targets in Release mode",
-            "configuration": "Release"
-        }
-    ]
+    {
+      "name": "x64-debug",
+      "displayName": "x64 Debug",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebug"
+      }
+    },
+    {
+      "name": "x64-release",
+      "displayName": "x64 Release",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-debug",
+      "configurePreset": "x64-debug",
+      "displayName": "Build Debug",
+      "description": "Build all targets in Debug mode",
+      "configuration": "Debug"
+    },
+    {
+      "name": "build-release",
+      "configurePreset": "x64-release",
+      "displayName": "Build Release",
+      "description": "Build all targets in Release mode",
+      "configuration": "Release"
+    }
+  ]
 }

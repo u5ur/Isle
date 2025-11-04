@@ -1,5 +1,6 @@
 // MainCamera.cpp
 #include "MainCamera.h"
+#include "CameraMan.h"
 
 namespace Isle
 {
@@ -16,6 +17,6 @@ namespace Isle
 
     void MainCamera::Update(float delta_time)
     {
-
+        m_Camera = CameraMan::Instance()->m_Camera;
     }
 }

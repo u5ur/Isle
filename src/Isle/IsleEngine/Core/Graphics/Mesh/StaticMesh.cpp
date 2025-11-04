@@ -11,5 +11,6 @@ namespace Isle
         GStaticMesh.m_MaterialIndex = GetMaterial()->m_Version;
         GStaticMesh.m_VertexOffset = GetVertexOffset();
         GStaticMesh.m_IndexOffset = GetIndexOffset();
+        return GStaticMesh;
 	}
 }

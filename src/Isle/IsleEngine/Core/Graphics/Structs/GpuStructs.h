@@ -18,6 +18,28 @@ namespace Isle
         glm::vec3 m_BitTangent;
         float _pad4;
         glm::vec4 m_Color;
+
+        GpuVertex() = default;
+        GpuVertex(
+            const glm::vec3& position,
+            const glm::vec3& normal,
+            const glm::vec2& texCoord,
+            const glm::vec3& tangent,
+            const glm::vec3& bitTangent,
+            const glm::vec4& color)
+            : m_Position(position),
+            _pad0(0.0f),
+            m_Normal(normal),
+            _pad1(0.0f),
+            m_TexCoord(texCoord),
+            _pad2(0.0f),
+            m_Tangent(tangent),
+            _pad3(0.0f),
+            m_BitTangent(bitTangent),
+            _pad4(0.0f),
+            m_Color(color)
+        {
+        }
     };
 
     struct alignas(16) GpuSkinnedVertex
