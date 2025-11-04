@@ -1,6 +1,6 @@
 IsleEngine (WIP)
 
-IsleEngineL is a full-scale C++ game engine built entirely on modern OpenGL.
+IsleEngine is a full-scale C++ game engine built entirely on modern OpenGL.
 
 ## Key Features
 
@@ -11,7 +11,11 @@ IsleEngineL is a full-scale C++ game engine built entirely on modern OpenGL.
 - PBR Materials
 - Indirect Rendering and Instancing
 
+
   To be added soon
 - Global Illumination and Reflections (hardware-accelerated voxelization using rasterization)
 - Animation and Skeletal Mesh Support  
 - Scriptable Gameplay Layer
+- Physics (using physx)
+- Volumetric Lighting/Effects
+- PostProcessing Effects
