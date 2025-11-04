@@ -27,6 +27,7 @@ namespace Isle
         for (int i = 0; i < cubeCount; ++i)
         {
             CubeMesh* cube = new CubeMesh();
+            cube->SetColor(glm::vec4(1, 1, 1, 1));
 
             float x = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * areaSize;
             float y = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * areaSize * 0.2f;

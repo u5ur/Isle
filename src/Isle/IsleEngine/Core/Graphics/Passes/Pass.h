@@ -22,6 +22,15 @@ namespace Isle
         virtual void Start() override;
         virtual void Update() override;
         virtual void Destroy() override;
+
+        Shader* GetShader();
+        void SetShader(Shader* shader);
+
+        FrameBuffer* GetFrameBuffer();
+        void SetFrameBuffer(FrameBuffer* buffer);
+
+        PipelineState* GetPipelineState();
+        void SetPipelineState(PipelineState* pipeline_state);
     };
 }
 

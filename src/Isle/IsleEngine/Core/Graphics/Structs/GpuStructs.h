@@ -2,7 +2,6 @@
 #pragma once
 #include <Core/Common/Common.h>
 
-
 namespace Isle
 {
     struct alignas(16) GpuVertex
@@ -122,30 +121,18 @@ namespace Isle
         float _pad0;
     };
 
-    struct alignas(16) GpuDirectionalLight
+    struct alignas(16) GpuLight
     {
         glm::vec3 m_Color;
         float m_Intensity;
-        glm::vec3 m_Direction;
-        float _pad0;
-        glm::mat4 m_LightSpaceMatrix;
-    };
-
-    struct alignas(16) GpuPointLight
-    {
-        glm::vec3 m_Color;
-        float m_Intensity;
-        glm::mat4 m_Transform;
-    };
-
-    struct alignas(16) GpuSpotLight
-    {
-        glm::vec3 m_Color;
-        float m_Intensity;
-        glm::mat4 m_Transform;
-        glm::vec2 m_ConeAngles;
+        glm::vec3 m_Position;
         float m_Radius;
-        float _pad0;
+        glm::vec3 m_Direction;
+        int m_Type;
+        glm::vec2 m_ConeAngles;
+        glm::vec2 _pad0;
+        glm::mat4 m_LightSpaceMatrix;
+        glm::mat4 m_ShadowMatrices[6];
     };
 
     struct alignas(16) GpuDrawCommand
@@ -168,18 +155,5 @@ namespace Isle
         float _pad2;
         glm::ivec3 m_Resolution;
         int m_MipCount;
-    };
-
-    struct alignas(16) GpuVoxelConeTrace
-    {
-        float m_MaxDistance;
-        float m_StepFactor;
-        int m_NumCones;
-        int m_NumSteps;
-
-        float m_Aperture;
-        float m_SpecularAperture;
-        float m_IndirectStrength;
-        float m_SpecularStrength;
     };
 }

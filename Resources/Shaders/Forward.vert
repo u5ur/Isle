@@ -1,3 +1,5 @@
+// Forward.vert
+
 #version 460 core
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_ARB_bindless_texture : require
@@ -13,11 +15,10 @@ layout(location = 5) flat out uint out_MaterialIndex;
 
 void main()
 {
-    GPU_Mesh mesh = meshes[gl_BaseInstance];
+    GpuStaticMesh mesh = meshes[gl_BaseInstance];
     
-    uint indexValue = indices[mesh.m_IndexOffset + gl_VertexID];
     uint vertexIndex = mesh.m_VertexOffset + gl_VertexID;
-    GPU_Vertex v = vertices[vertexIndex];
+    GpuVertex v = vertices[vertexIndex];
     
     out_WorldPos = vec3(mesh.m_Transform * vec4(v.m_Position, 1.0));
     out_Normal = normalize(mat3(mesh.m_NormalMatrix) * v.m_Normal);

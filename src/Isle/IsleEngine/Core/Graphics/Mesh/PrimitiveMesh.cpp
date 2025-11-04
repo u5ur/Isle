@@ -73,7 +73,6 @@ namespace Isle
 
         m_Vertices = Vertices;
         m_Indices = Indices;
-        SetIndexCount(Indices.size());
     }
 
     PlaneMesh::PlaneMesh()

@@ -21,10 +21,10 @@ namespace Isle
     GpuMaterial Material::GetGpuMaterial()
     {
         GpuMaterial GMaterial{};
-        GMaterial.m_BaseColor_TexIndex = GetTexture("BaseColor") ? GetTexture("BaseColor")->m_BindlessIndex : 0u;
-        GMaterial.m_Emissive_TexIndex = GetTexture("Emissive") ? GetTexture("Emissive")->m_BindlessIndex : 0u;
-        GMaterial.m_MetallicRoughness_TexIndex = GetTexture("MetallicRoughness") ? GetTexture("MetallicRoughness")->m_BindlessIndex : 0u;
-        GMaterial.m_Occlusion_TexIndex = GetTexture("Occlusion") ? GetTexture("Occlusion")->m_BindlessIndex : 0u;
+        GMaterial.m_BaseColor_TexIndex = GetTexture("BaseColor") ? GetTexture("BaseColor")->m_BindlessIndex : -1;
+        GMaterial.m_Emissive_TexIndex = GetTexture("Emissive") ? GetTexture("Emissive")->m_BindlessIndex : -1;
+        GMaterial.m_MetallicRoughness_TexIndex = GetTexture("MetallicRoughness") ? GetTexture("MetallicRoughness")->m_BindlessIndex : -1;
+        GMaterial.m_Occlusion_TexIndex = GetTexture("Occlusion") ? GetTexture("Occlusion")->m_BindlessIndex : -1;
         GMaterial.m_NormalScale = m_NormalScale;
         GMaterial.m_OcclusionStrength = m_OcclusionStrength;
         GMaterial.m_MetallicFactor = m_MetallicFactor;
