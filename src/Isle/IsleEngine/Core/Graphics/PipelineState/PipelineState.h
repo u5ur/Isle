@@ -39,7 +39,7 @@ namespace Isle
 		ALWAYS
 	};
 
-	class PipelineState
+	class PipelineState : public Object
 	{
 	private:
 		bool m_DepthTest = true;

@@ -1,4 +1,3 @@
-// Material.h
 #pragma once
 #include <Core/Common/Common.h>
 #include <Core/Graphics/Structs/GpuStructs.h>
@@ -13,10 +12,10 @@ namespace Isle
     {
     public:
         uint32_t m_Version = 0;
-        Shader* m_Shader = nullptr;
-        PipelineState* m_PipelineState = nullptr;
 
-        std::map<std::string, Texture*> m_Textures;
+        Ref<Shader> m_Shader = nullptr;
+        Ref<PipelineState> m_PipelineState = nullptr;
+        std::map<std::string, Ref<Texture>> m_Textures;
 
     private:
         glm::vec4 m_BaseColorFactor = glm::vec4(1.0f);
@@ -31,12 +30,13 @@ namespace Isle
 
     public:
         Material();
-
         void Bind();
         GpuMaterial GetGpuMaterial();
 
-        Texture* GetTexture(std::string name);
-        void SetTexture(std::string name, Texture* texture);
+        Ref<Texture> GetTexture(const std::string& name);
+        void SetTexture(const std::string& name, Ref<Texture> texture);
+        void SetShader(Ref<Shader> shader) { m_Shader = shader; m_Version++; }
+        void SetPipelineState(Ref<PipelineState> state) { m_PipelineState = state; m_Version++; }
 
         void SetBaseColorFactor(const glm::vec4& value);
         void SetMetallicFactor(float value);
@@ -57,6 +57,5 @@ namespace Isle
         float GetEmissiveStrength() const { return m_EmissiveStrength; }
         float GetIOR() const { return m_IOR; }
         bool GetTransparent() const { return m_Transparent; }
-
     };
 }

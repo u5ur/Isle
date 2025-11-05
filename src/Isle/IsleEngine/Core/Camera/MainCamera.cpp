@@ -1,22 +1,27 @@
 // MainCamera.cpp
 #include "MainCamera.h"
-#include "CameraMan.h"
 
 namespace Isle
 {
-    void MainCamera::SetCamera(Camera* camera)
-    {
-        m_Camera = camera;
-    }
 
     void MainCamera::Start()
     {
         this->SetName("MainCamera");
-        m_Camera = new Camera();
+        AddChild(new Camera());
     }
 
     void MainCamera::Update(float delta_time)
     {
-        m_Camera = CameraMan::Instance()->m_Camera;
+
+    }
+
+    Camera* MainCamera::GetCamera()
+    {
+        return GetChild<Camera>();
+    }
+
+    void MainCamera::SetCamera(Camera* camera)
+    {
+        SetChild(0, camera);
     }
 }

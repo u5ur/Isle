@@ -17,18 +17,6 @@ namespace Isle
         const int m_Id;
         std::string m_Name;
 
-        void AutoRegister()
-        {
-            std::unique_lock<std::shared_mutex> lock(s_RegistryMutex);
-            s_Registry[m_Id] = weak_from_this();
-        }
-
-        void AutoUnregister()
-        {
-            std::unique_lock<std::shared_mutex> lock(s_RegistryMutex);
-            s_Registry.erase(m_Id);
-        }
-
     protected:
         Object(std::string name = "")
             : m_Id(s_NextId.fetch_add(1, std::memory_order_relaxed))
@@ -47,6 +35,18 @@ namespace Isle
         int GetId() const { return m_Id; }
         const std::string& GetName() const { return m_Name; }
         void SetName(std::string name) { m_Name = std::move(name); }
+
+        void AutoRegister()
+        {
+            std::unique_lock<std::shared_mutex> lock(s_RegistryMutex);
+            s_Registry[m_Id] = weak_from_this();
+        }
+
+        void AutoUnregister()
+        {
+            std::unique_lock<std::shared_mutex> lock(s_RegistryMutex);
+            s_Registry.erase(m_Id);
+        }
 
         virtual std::string ToString() const
         {

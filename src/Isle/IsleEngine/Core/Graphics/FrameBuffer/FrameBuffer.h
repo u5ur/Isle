@@ -25,7 +25,9 @@ namespace Isle
         RADIANCE,
         SCENE,
         HDR,
-        FINAL
+        FINAL,
+        SHADOW_MAP,
+        SHADOW_CUBE
     };
 
     class FrameBuffer : public GfxResource
@@ -34,7 +36,8 @@ namespace Isle
         GLuint m_Id = 0;
         int m_Width;
         int m_Height;
-        std::map<ATTACHMENT_TYPE, Texture*> m_Attachments;
+
+        std::map<ATTACHMENT_TYPE, Ref<Texture>> m_Attachments;
         std::vector<GLenum> m_DrawBuffers;
 
     public:
@@ -43,31 +46,26 @@ namespace Isle
 
         void Create();
         void Destroy();
-
         void Load() override;
         void Unload() override { Destroy(); }
         void Bind(uint32_t slot = 0) override;
         void Unbind(uint32_t slot = 0) override;
 
-        Texture* AddAttachment(ATTACHMENT_TYPE type, TEXTURE_FORMAT format = TEXTURE_FORMAT::RGBA16F, bool generateMipmaps = false);
-        void AttachTexture(ATTACHMENT_TYPE type, Texture* texture, int attachmentIndex = 0);
-        void AttachDepthTexture(Texture* texture);
-        void AttachDepthStencilTexture(Texture* texture);
+        // CHANGED: Returns Ref instead of raw pointer
+        Ref<Texture> AddAttachment(ATTACHMENT_TYPE type, TEXTURE_FORMAT format = TEXTURE_FORMAT::RGBA16F, bool generateMipmaps = false);
+        void AttachTexture(ATTACHMENT_TYPE type, Ref<Texture> texture, int attachmentIndex = 0);
+        void AttachDepthTexture(Ref<Texture> texture);
+        void AttachDepthStencilTexture(Ref<Texture> texture);
+        Ref<Texture> GetAttachment(ATTACHMENT_TYPE type);
 
-        Texture* GetAttachment(ATTACHMENT_TYPE type);
         void SetDrawBuffers(const std::vector<ATTACHMENT_TYPE>& targets);
-
         bool CheckStatus();
         void Clear(const glm::vec4& color = glm::vec4(0.0f), float depth = 1.0f, int stencil = 0);
         void ClearColor(const glm::vec4& color = glm::vec4(0.0f));
         void ClearDepth(float depth = 1.0f);
-
         void Resize(int width, int height);
-        void BlitTo(FrameBuffer* target, GLbitfield mask = GL_COLOR_BUFFER_BIT,
-                   GLenum filter = GL_NEAREST);
-        void BlitToTexture(Texture* targetTexture, GLbitfield mask = GL_COLOR_BUFFER_BIT,
-            GLenum filter = GL_NEAREST);
-
+        void BlitTo(FrameBuffer* target, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
+        void BlitToTexture(Ref<Texture> targetTexture, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
         void SetDebugLabel(const std::string& name);
 
         static GLenum ResolveAttachment(ATTACHMENT_TYPE type, int index = 0);

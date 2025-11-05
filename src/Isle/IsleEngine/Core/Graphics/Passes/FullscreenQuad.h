@@ -7,8 +7,8 @@ namespace Isle
     class FullscreenQuad
     {
     private:
-        GfxBuffer* m_VertexBuffer = nullptr;
-        GfxBuffer* m_IndexBuffer = nullptr;
+        Ref<GfxBuffer> m_VertexBuffer = nullptr;
+        Ref<GfxBuffer> m_IndexBuffer = nullptr;
 
     public:
         FullscreenQuad();

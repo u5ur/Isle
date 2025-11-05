@@ -21,10 +21,16 @@ namespace Isle
     GpuMaterial Material::GetGpuMaterial()
     {
         GpuMaterial GMaterial{};
-        GMaterial.m_BaseColor_TexIndex = GetTexture("BaseColor") ? GetTexture("BaseColor")->m_BindlessIndex : -1;
-        GMaterial.m_Emissive_TexIndex = GetTexture("Emissive") ? GetTexture("Emissive")->m_BindlessIndex : -1;
-        GMaterial.m_MetallicRoughness_TexIndex = GetTexture("MetallicRoughness") ? GetTexture("MetallicRoughness")->m_BindlessIndex : -1;
-        GMaterial.m_Occlusion_TexIndex = GetTexture("Occlusion") ? GetTexture("Occlusion")->m_BindlessIndex : -1;
+
+        auto baseColorTex = GetTexture("BaseColor");
+        auto emissiveTex = GetTexture("Emissive");
+        auto metallicRoughnessTex = GetTexture("MetallicRoughness");
+        auto occlusionTex = GetTexture("Occlusion");
+
+        GMaterial.m_BaseColor_TexIndex = baseColorTex ? baseColorTex->m_BindlessIndex : -1;
+        GMaterial.m_Emissive_TexIndex = emissiveTex ? emissiveTex->m_BindlessIndex : -1;
+        GMaterial.m_MetallicRoughness_TexIndex = metallicRoughnessTex ? metallicRoughnessTex->m_BindlessIndex : -1;
+        GMaterial.m_Occlusion_TexIndex = occlusionTex ? occlusionTex->m_BindlessIndex : -1;
         GMaterial.m_NormalScale = m_NormalScale;
         GMaterial.m_OcclusionStrength = m_OcclusionStrength;
         GMaterial.m_MetallicFactor = m_MetallicFactor;
@@ -32,16 +38,17 @@ namespace Isle
         GMaterial.m_BaseColorFactor = m_BaseColorFactor;
         GMaterial.m_RoughnessFactor = m_RoughnessFactor;
         GMaterial.m_IOR = m_IOR;
+
         return GMaterial;
     }
 
-
-    Texture* Material::GetTexture(std::string name)
+    Ref<Texture> Material::GetTexture(const std::string& name)
     {
-        return m_Textures[name];
+        auto it = m_Textures.find(name);
+        return (it != m_Textures.end()) ? it->second : nullptr;
     }
 
-    void Material::SetTexture(std::string name, Texture* texture)
+    void Material::SetTexture(const std::string& name, Ref<Texture> texture)
     {
         m_Textures[name] = texture;
         m_Version++;

@@ -84,7 +84,7 @@ namespace Isle
         void Bind(uint32_t slot = 0) override;
         void Unbind(uint32_t slot = 0) override;
 
-        void BindAsImage(uint32_t slot, GLenum access = GL_READ_WRITE);
+        void BindAsImage(GLuint unit, GLenum access = GL_READ_WRITE, GLint level = 0);
         void UnbindAsImage(uint32_t slot);
 
         void SetMinFilter(TEXTURE3D_FILTER filter);

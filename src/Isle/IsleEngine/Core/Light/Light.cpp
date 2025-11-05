@@ -20,23 +20,21 @@ namespace Isle
         m_ViewMatrix = glm::mat4(1.0f);
         m_ProjectionMatrix = glm::mat4(1.0f);
         m_Dir = glm::normalize(glm::vec3(-0.1f, -1.0f, 0.15f));
-        m_Color = glm::vec4(1, 0.5f, 0.4f, 1.0f);
+        m_Color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
         m_Intensity = 1.0f;
     }
 
     glm::mat4 DirectionalLight::GetLightSpaceMatrix()
     {
-        float orthoSize = 20.0f;
+        float orthoSize = 10.0f;
         float nearPlane = 0.1f;
         float farPlane = 150.0f;
 
         glm::vec3 lightDir = glm::normalize(m_Dir);
         glm::vec3 target = glm::vec3(0.0f);
         glm::vec3 lightPos = target - lightDir * 100.0f;
-
         m_ViewMatrix = glm::lookAt(lightPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
         m_ProjectionMatrix = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
-
         return m_ProjectionMatrix * m_ViewMatrix;
     }
 
@@ -107,7 +105,7 @@ namespace Isle
         GpuLight gpu{};
         gpu.m_Color = glm::vec3(m_Color);
         gpu.m_Intensity = m_Intensity;
-        gpu.m_Direction = glm::normalize(m_Dir);
+        gpu.m_Direction = m_Dir;
         gpu.m_Type = 0;
         gpu.m_LightSpaceMatrix = GetLightSpaceMatrix();
         return gpu;

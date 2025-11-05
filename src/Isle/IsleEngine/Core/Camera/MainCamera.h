@@ -8,7 +8,6 @@ namespace Isle
 	class MainCamera : public Singleton<MainCamera>, public SceneComponent
 	{
 	public:
-		Camera* m_Camera;
 		bool m_UseCameraMan = false;
 
 	public:
@@ -16,5 +15,6 @@ namespace Isle
 		virtual void Update(float delta_time) override;
 
 		void SetCamera(Camera* camera);
+		Camera* GetCamera();
 	};
 }

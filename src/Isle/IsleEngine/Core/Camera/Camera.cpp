@@ -112,6 +112,9 @@ namespace Isle
 
     GpuCamera Camera::GetCpuCamera()
     {
+        if (!this)
+            return {};
+
         GpuCamera GCamera{};
         GCamera.m_CameraPos = m_Transform.m_Translation;
         GCamera.m_ProjectionMatrix = m_ProjectionMatrix;

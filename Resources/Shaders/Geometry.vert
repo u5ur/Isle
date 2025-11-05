@@ -1,3 +1,4 @@
+// Geometry.vert
 #version 460 core
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_ARB_bindless_texture : require
@@ -17,7 +18,7 @@ void main()
     uint meshIndex = gl_BaseInstance;
     GpuStaticMesh mesh = meshes[meshIndex];
 
-    uint vertexIndex = mesh.m_VertexOffset + gl_VertexID; 
+    uint vertexIndex = mesh.m_VertexOffset + gl_VertexID;
     GpuVertex v = vertices[vertexIndex];
 
     mat3 normalMat = mat3(mesh.m_NormalMatrix);

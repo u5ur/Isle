@@ -4,7 +4,7 @@
 
 namespace Isle
 {
-    class GfxResource
+    class GfxResource : public Object
     {
     protected:
         bool m_IsLoaded = false;

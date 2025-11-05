@@ -1,4 +1,3 @@
-// Pipeline.h
 #pragma once
 #include <Core/Common/Common.h>
 #include <Core/Graphics/Structs/GpuStructs.h>
@@ -6,7 +5,9 @@
 #include <Core/Graphics/Passes/FowardPass.h>
 #include <Core/Graphics/Passes/GeometryPass.h>
 #include <Core/Graphics/Passes/LightingPass.h>
+#include <Core/Graphics/Passes/ShadowPass.h>
 #include <Core/Graphics/Passes/FullscreenQuad.h>
+#include <Core/Graphics/Passes/VoxelPass.h>
 
 namespace Isle
 {
@@ -19,20 +20,21 @@ namespace Isle
     class Pipeline : public Component
     {
     private:
-        GfxBuffer* m_VertexBuffer;
-        GfxBuffer* m_IndexBuffer;
-        GfxBuffer* m_MaterialBuffer;
-        GfxBuffer* m_CameraBuffer;
-        GfxBuffer* m_LightBuffer;
-        GfxBuffer* m_StaticMeshBuffer;
-        GfxBuffer* m_DrawCommandBuffer;
-        GfxBuffer* m_TextureBuffer;
-        GfxBuffer* m_DummyVAO;
+        Ref<GfxBuffer> m_VertexBuffer;
+        Ref<GfxBuffer> m_IndexBuffer;
+        Ref<GfxBuffer> m_MaterialBuffer;
+        Ref<GfxBuffer> m_CameraBuffer;
+        Ref<GfxBuffer> m_LightBuffer;
+        Ref<GfxBuffer> m_StaticMeshBuffer;
+        Ref<GfxBuffer> m_DrawCommandBuffer;
+        Ref<GfxBuffer> m_TextureBuffer;
+        Ref<GfxBuffer> m_DummyVAO;
 
         ForwardPass* m_ForwardPass;
         GeometryPass* m_GeometryPass;
         LightingPass* m_LightingPass;
-
+        ShadowPass* m_ShadowPass;
+        VoxelPass* m_VoxelPass;
         FullscreenQuad* m_FullscreenQuad;
 
     public:
@@ -41,14 +43,12 @@ namespace Isle
         virtual void Destroy() override;
 
         void Draw();
-
-        void AddIndexBuffer(std::vector<unsigned int> indicies);
+        void AddIndexBuffer(std::vector<unsigned int> indices);
         void AddVertexBuffer(std::vector<GpuVertex> vertex);
         void AddStaticMesh(StaticMesh* mesh);
         void AddMaterial(Material* material);
         void AddLight(Light* light);
         void AddDrawCommand(Mesh* mesh);
-
         void SetCamera(Camera* camera);
 
         int GetNumVertices();

@@ -14,11 +14,6 @@ namespace Isle
 
     Material* Mesh::GetMaterial()
     {
-        return m_Material;
-    }
-
-    void Mesh::SetMaterial(Material* material)
-    {
-        m_Material = material;
+        return m_Material.Get();
     }
 }

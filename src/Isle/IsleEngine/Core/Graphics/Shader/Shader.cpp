@@ -116,6 +116,18 @@ namespace Isle
         if (!CheckProgramErrors(m_ProgramId))
             return false;
 
+        glValidateProgram(m_ProgramId);
+        GLint validated;
+        glGetProgramiv(m_ProgramId, GL_VALIDATE_STATUS, &validated);
+        if (!validated)
+        {
+            GLchar infoLog[1024];
+            glGetProgramInfoLog(m_ProgramId, 1024, NULL, infoLog);
+            ISLE_ERROR("PROGRAM_VALIDATION_ERROR: %s\n", infoLog);
+            return false;
+        }
+
+
         for (GLuint shader : m_AttachedShaders)
             glDetachShader(m_ProgramId, shader);
 

@@ -9,7 +9,7 @@ namespace Isle
     }
 
     void Texture3D::Create(int width, int height, int depth, TEXTURE3D_FORMAT format,
-                          const void* data, bool generateMipmaps)
+        const void* data, bool generateMipmaps)
     {
         m_Width = width;
         m_Height = height;
@@ -26,8 +26,15 @@ namespace Isle
         GLenum dataFormat = ResolveFormat(format);
         GLenum dataType = ResolveDataType(format);
 
-        glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, width, height, depth, 0,
-                    dataFormat, dataType, data);
+        // Use glTexStorage3D for better image load/store compatibility
+        if (!data) {
+            int levels = generateMipmaps ? (int)glm::floor(glm::log2((float)glm::max(width, glm::max(height, depth)))) + 1 : 1;
+            glTexStorage3D(GL_TEXTURE_3D, levels, internalFormat, width, height, depth);
+        }
+        else {
+            glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, width, height, depth, 0,
+                dataFormat, dataType, data);
+        }
 
         SetMinFilter(m_MinFilter);
         SetMagFilter(m_MagFilter);
@@ -78,12 +85,10 @@ namespace Isle
         m_Slot = -1;
     }
 
-    void Texture3D::BindAsImage(uint32_t slot, GLenum access)
+    void Texture3D::BindAsImage(GLuint unit, GLenum access, GLint level)
     {
-        if (!m_Id) return;
-        GLenum format = ResolveInternalFormat(m_Format);
-        glBindImageTexture(slot, m_Id, 0, GL_TRUE, 0, access, format);
-        m_ImageSlot = slot;
+        glBindImageTexture(unit, m_Id, level, GL_FALSE, 0, access, ResolveInternalFormat(m_Format));
+        m_ImageSlot = unit;
     }
 
     void Texture3D::UnbindAsImage(uint32_t slot)

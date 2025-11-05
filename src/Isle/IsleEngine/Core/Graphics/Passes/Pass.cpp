@@ -30,35 +30,4 @@ namespace Isle
             m_FrameBuffer->BlitTo(nullptr, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
     }
-
-
-    Shader* Pass::GetShader()
-    {
-        return m_Shader;
-    }
-
-    void Pass::SetShader(Shader* shader)
-    {
-        m_Shader = shader;
-    }
-
-    FrameBuffer* Pass::GetFrameBuffer()
-    {
-        return m_FrameBuffer;
-    }
-
-    void Pass::SetFrameBuffer(FrameBuffer* buffer)
-    {
-        m_FrameBuffer = buffer;
-    }
-
-    PipelineState* Pass::GetPipelineState()
-    {
-        return m_PipelineState;
-    }
-
-    void Pass::SetPipelineState(PipelineState* pipeline_state)
-    {
-        m_PipelineState = pipeline_state;
-    }
 }

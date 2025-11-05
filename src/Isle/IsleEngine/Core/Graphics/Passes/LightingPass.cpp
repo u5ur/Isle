@@ -5,7 +5,7 @@ namespace Isle
 {
     void LightingPass::Start()
     {
-        m_FrameBuffer = new FrameBuffer(1920, 1080);
+        m_FrameBuffer = New<FrameBuffer>(1920, 1080);
         m_FrameBuffer->AddAttachment(ATTACHMENT_TYPE::COLOR, TEXTURE_FORMAT::RGBA16F);
 
         if (!m_FrameBuffer->CheckStatus())
@@ -13,12 +13,12 @@ namespace Isle
             ISLE_ERROR("ForwardPass framebuffer incomplete!\n");
         }
 
-        m_Shader = new Shader();
+        m_Shader = New<Shader>();
         m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "..\\Resources\\Shaders\\Lighting.frag");
         m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "..\\Resources\\Shaders\\Lighting.vert");
         m_Shader->Link();
 
-        m_PipelineState = new PipelineState();
+        m_PipelineState = New<PipelineState>();
 
         m_PipelineState->SetDepthTest(false);
         m_PipelineState->SetDepthWrite(false);

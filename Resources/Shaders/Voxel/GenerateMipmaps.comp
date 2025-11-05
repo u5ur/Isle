@@ -1,0 +1,70 @@
+#version 460
+layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(binding = 0, rgba16f) uniform image3D u_RadianceOut;
+layout(binding = 1, rgba16f) uniform image3D u_NormalOut;
+layout(binding = 2, rgba16f) uniform image3D u_RadianceIn;
+layout(binding = 3, rgba16f) uniform image3D u_NormalIn;
+
+uniform int u_MipLevel;
+uniform ivec3 u_RegionMin;
+uniform ivec3 u_RegionMax;
+
+void main()
+{
+    ivec3 outVoxel = ivec3(gl_GlobalInvocationID.xyz) + u_RegionMin;
+    ivec3 inBase = outVoxel * 2;
+    ivec3 inputSize = imageSize(u_RadianceIn);
+    
+    if (any(greaterThanEqual(inBase, inputSize)))
+        return;
+    
+    vec4 radianceAccum = vec4(0.0);
+    vec3 normalAccum = vec3(0.0);
+    float albedoAccum = 0.0;
+    float totalWeight = 0.0;
+    float maxAlpha = 0.0;
+    
+    #define SAMPLE_VOXEL(ox, oy, oz) \
+    { \
+        ivec3 pos = inBase + ivec3(ox, oy, oz); \
+        if (all(lessThan(pos, inputSize))) { \
+            vec4 rad = imageLoad(u_RadianceIn, pos); \
+            float w = rad.a; \
+            maxAlpha = max(maxAlpha, w); \
+            if (w > 0.0) { \
+                radianceAccum.rgb += rad.rgb * w; \
+                vec4 norm = imageLoad(u_NormalIn, pos); \
+                normalAccum += (norm.xyz * 2.0 - 1.0) * w; \
+                albedoAccum += norm.a * w; \
+                totalWeight += w; \
+            } \
+        } \
+    }
+    
+    SAMPLE_VOXEL(0, 0, 0);
+    SAMPLE_VOXEL(1, 0, 0);
+    SAMPLE_VOXEL(0, 1, 0);
+    SAMPLE_VOXEL(1, 1, 0);
+    SAMPLE_VOXEL(0, 0, 1);
+    SAMPLE_VOXEL(1, 0, 1);
+    SAMPLE_VOXEL(0, 1, 1);
+    SAMPLE_VOXEL(1, 1, 1);
+    
+    #undef SAMPLE_VOXEL
+    
+    float hasWeight = step(0.001, totalWeight);
+    
+    vec3 radianceResult = radianceAccum.rgb / max(totalWeight, 1.0);
+    vec3 normalResult = normalize(normalAccum + vec3(0.0, 0.0, 0.001));
+    vec3 storedNormal = normalResult * 0.5 + 0.5;
+    float averageAlbedo = albedoAccum / max(totalWeight, 1.0);
+    
+    vec3 finalRadiance = mix(vec3(0.0), radianceResult, hasWeight);
+    float finalAlpha = mix(0.0, maxAlpha, hasWeight);
+    vec3 finalNormal = mix(vec3(0.5, 0.5, 1.0), storedNormal, hasWeight);
+    float finalAlbedo = mix(0.0, averageAlbedo, hasWeight);
+    
+    imageStore(u_RadianceOut, outVoxel, vec4(finalRadiance, finalAlpha));
+    imageStore(u_NormalOut, outVoxel, vec4(finalNormal, finalAlbedo));
+}

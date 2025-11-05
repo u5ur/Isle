@@ -1,4 +1,3 @@
-// FrameBuffer.cpp
 #include "FrameBuffer.h"
 #include "../Texture/Texture.h"
 
@@ -19,7 +18,6 @@ namespace Isle
     {
         if (!m_Id)
             glGenFramebuffers(1, &m_Id);
-
         m_IsLoaded = true;
     }
 
@@ -55,40 +53,61 @@ namespace Isle
         m_IsResident = false;
     }
 
-    Texture* FrameBuffer::AddAttachment(ATTACHMENT_TYPE type, TEXTURE_FORMAT format, bool generateMipmaps)
+    Ref<Texture> FrameBuffer::AddAttachment(ATTACHMENT_TYPE type, TEXTURE_FORMAT format, bool generateMipmaps)
     {
         if (!m_Id)
             Create();
 
-        if (type == ATTACHMENT_TYPE::DEPTH)
-            format = TEXTURE_FORMAT::DEPTH32F;
-        else if (type == ATTACHMENT_TYPE::DEPTH_STENCIL)
-            format = TEXTURE_FORMAT::DEPTH24_STENCIL8;
-
-        auto* texture = new Texture();
-        texture->Create(m_Width, m_Height, format, nullptr, generateMipmaps);
-
         glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
-        GLenum attachment = ResolveAttachment(type, 0);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture->m_Id, 0);
 
-        if (type != ATTACHMENT_TYPE::DEPTH && type != ATTACHMENT_TYPE::DEPTH_STENCIL)
+        if (type == ATTACHMENT_TYPE::DEPTH || type == ATTACHMENT_TYPE::SHADOW_MAP || type == ATTACHMENT_TYPE::SHADOW_CUBE)
         {
-            GLenum colorAttachment = ResolveAttachment(type, static_cast<int>(m_DrawBuffers.size()));
-            m_DrawBuffers.push_back(colorAttachment);
+            format = TEXTURE_FORMAT::DEPTH32F;
+        }
+        else if (type == ATTACHMENT_TYPE::DEPTH_STENCIL)
+        {
+            format = TEXTURE_FORMAT::DEPTH24_STENCIL8;
+        }
 
-            if (!m_DrawBuffers.empty()) {
+        // CHANGED: Create texture with Ref
+        auto texture = New<Texture>();
+
+        if (type == ATTACHMENT_TYPE::SHADOW_MAP)
+        {
+            texture->Create(m_Width, m_Height, TEXTURE_FORMAT::DEPTH32F, nullptr, false);
+            texture->Bind();
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+            GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture->m_Id, 0);
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+            texture->Unbind();
+        }
+        else
+        {
+            texture->Create(m_Width, m_Height, format, nullptr, generateMipmaps);
+            GLenum attachment = ResolveAttachment(type, static_cast<int>(m_DrawBuffers.size()));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture->m_Id, 0);
+
+            if (type != ATTACHMENT_TYPE::DEPTH && type != ATTACHMENT_TYPE::DEPTH_STENCIL)
+            {
+                m_DrawBuffers.push_back(attachment);
                 glDrawBuffers(static_cast<GLsizei>(m_DrawBuffers.size()), m_DrawBuffers.data());
             }
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         m_Attachments[type] = texture;
         return texture;
     }
 
-    void FrameBuffer::AttachTexture(ATTACHMENT_TYPE type, Texture* texture, int attachmentIndex)
+    void FrameBuffer::AttachTexture(ATTACHMENT_TYPE type, Ref<Texture> texture, int attachmentIndex)
     {
         if (!texture || !m_Id) return;
 
@@ -105,17 +124,17 @@ namespace Isle
         }
     }
 
-    void FrameBuffer::AttachDepthTexture(Texture* texture)
+    void FrameBuffer::AttachDepthTexture(Ref<Texture> texture)
     {
         AttachTexture(ATTACHMENT_TYPE::DEPTH, texture);
     }
 
-    void FrameBuffer::AttachDepthStencilTexture(Texture* texture)
+    void FrameBuffer::AttachDepthStencilTexture(Ref<Texture> texture)
     {
         AttachTexture(ATTACHMENT_TYPE::DEPTH_STENCIL, texture);
     }
 
-    Texture* FrameBuffer::GetAttachment(ATTACHMENT_TYPE type)
+    Ref<Texture> FrameBuffer::GetAttachment(ATTACHMENT_TYPE type)
     {
         auto it = m_Attachments.find(type);
         return (it != m_Attachments.end()) ? it->second : nullptr;
@@ -124,26 +143,30 @@ namespace Isle
     void FrameBuffer::SetDrawBuffers(const std::vector<ATTACHMENT_TYPE>& targets)
     {
         m_DrawBuffers.clear();
-
         glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
 
-        for (int i = 0; i < targets.size(); i++) {
+        for (int i = 0; i < targets.size(); i++)
+        {
             ATTACHMENT_TYPE type = targets[i];
-            if (type != ATTACHMENT_TYPE::DEPTH && type != ATTACHMENT_TYPE::DEPTH_STENCIL) {
+            if (type != ATTACHMENT_TYPE::DEPTH && type != ATTACHMENT_TYPE::DEPTH_STENCIL)
+            {
                 GLenum attachment = GL_COLOR_ATTACHMENT0 + i;
                 m_DrawBuffers.push_back(attachment);
 
-                Texture* tex = GetAttachment(type);
-                if (tex) {
+                auto tex = GetAttachment(type);
+                if (tex)
+                {
                     glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, tex->m_Id, 0);
                 }
             }
         }
 
-        if (!m_DrawBuffers.empty()) {
+        if (!m_DrawBuffers.empty())
+        {
             glDrawBuffers(static_cast<GLsizei>(m_DrawBuffers.size()), m_DrawBuffers.data());
         }
-        else {
+        else
+        {
             glDrawBuffer(GL_NONE);
         }
 
@@ -172,7 +195,6 @@ namespace Isle
         glClearStencil(stencil);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     }
-
 
     void FrameBuffer::ClearColor(const glm::vec4& color)
     {
@@ -209,19 +231,16 @@ namespace Isle
         int targetHeight = target ? target->m_Height : m_Height;
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, m_Id);
-
         glReadBuffer(GL_COLOR_ATTACHMENT0);
-
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, targetId);
         glBlitFramebuffer(0, 0, m_Width, m_Height,
-            0, 0, targetWidth, targetHeight,
-            mask, filter);
+            0, 0, targetWidth, targetHeight, mask, filter);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void FrameBuffer::BlitToTexture(Texture* targetTexture, GLbitfield mask, GLenum filter)
+    void FrameBuffer::BlitToTexture(Ref<Texture> targetTexture, GLbitfield mask, GLenum filter)
     {
-        if (!targetTexture) 
+        if (!targetTexture)
             return;
 
         GLuint tempFBO;
@@ -232,8 +251,7 @@ namespace Isle
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, m_Id);
         glBlitFramebuffer(0, 0, m_Width, m_Height,
-            0, 0, targetTexture->m_Width, targetTexture->m_Height,
-            mask, filter);
+            0, 0, targetTexture->m_Width, targetTexture->m_Height, mask, filter);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDeleteFramebuffers(1, &tempFBO);
@@ -249,29 +267,26 @@ namespace Isle
     {
         switch (type)
         {
-            case ATTACHMENT_TYPE::COLOR:
-            case ATTACHMENT_TYPE::NORMAL:
-            case ATTACHMENT_TYPE::EMISSIVE:
-            case ATTACHMENT_TYPE::MATERIAL:
-            case ATTACHMENT_TYPE::VELOCITY:
-            case ATTACHMENT_TYPE::LIGHTING:
-            case ATTACHMENT_TYPE::INDIRECT:
-            case ATTACHMENT_TYPE::SPECULAR:
-            case ATTACHMENT_TYPE::REFLECTION:
-            case ATTACHMENT_TYPE::RADIANCE:
-            case ATTACHMENT_TYPE::SCENE:
-            case ATTACHMENT_TYPE::HDR:
-            case ATTACHMENT_TYPE::FINAL:
-                return GL_COLOR_ATTACHMENT0 + index;
-
-            case ATTACHMENT_TYPE::DEPTH:
-                return GL_DEPTH_ATTACHMENT;
-
-            case ATTACHMENT_TYPE::DEPTH_STENCIL:
-                return GL_DEPTH_STENCIL_ATTACHMENT;
-
-            default:
-                return GL_COLOR_ATTACHMENT0;
+        case ATTACHMENT_TYPE::COLOR:
+        case ATTACHMENT_TYPE::NORMAL:
+        case ATTACHMENT_TYPE::EMISSIVE:
+        case ATTACHMENT_TYPE::MATERIAL:
+        case ATTACHMENT_TYPE::VELOCITY:
+        case ATTACHMENT_TYPE::LIGHTING:
+        case ATTACHMENT_TYPE::INDIRECT:
+        case ATTACHMENT_TYPE::SPECULAR:
+        case ATTACHMENT_TYPE::REFLECTION:
+        case ATTACHMENT_TYPE::RADIANCE:
+        case ATTACHMENT_TYPE::SCENE:
+        case ATTACHMENT_TYPE::HDR:
+        case ATTACHMENT_TYPE::FINAL:
+            return GL_COLOR_ATTACHMENT0 + index;
+        case ATTACHMENT_TYPE::DEPTH:
+            return GL_DEPTH_ATTACHMENT;
+        case ATTACHMENT_TYPE::DEPTH_STENCIL:
+            return GL_DEPTH_STENCIL_ATTACHMENT;
+        default:
+            return GL_COLOR_ATTACHMENT0;
         }
     }
 }

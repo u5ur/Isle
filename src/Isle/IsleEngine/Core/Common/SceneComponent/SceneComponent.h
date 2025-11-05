@@ -38,6 +38,36 @@ namespace Isle
 			}
 		}
 
+		void SetChild(size_t index, SceneComponent* child, bool transferOwnership = true)
+		{
+			if (index >= m_Children.size())
+				return;
+
+			if (!child)
+			{
+				SceneComponent* oldChild = m_Children[index];
+				if (oldChild && transferOwnership)
+					oldChild->m_Owner = nullptr;
+				m_Children[index] = nullptr;
+				return;
+			}
+
+			if (child == this)
+				return;
+
+			if (transferOwnership && child->m_Owner)
+				child->m_Owner->RemoveChild(child);
+
+			SceneComponent* oldChild = m_Children[index];
+			if (oldChild && transferOwnership)
+				oldChild->m_Owner = nullptr;
+
+			if (transferOwnership)
+				child->m_Owner = this;
+
+			m_Children[index] = child;
+		}
+
 		void RemoveAllChildren()
 		{
 			for (auto* child : m_Children)

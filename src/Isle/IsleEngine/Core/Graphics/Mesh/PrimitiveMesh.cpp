@@ -1,8 +1,5 @@
 #include "PrimitiveMesh.h"
 #include <Core/Graphics/Material/Material.h>
-#include <Core/Graphics/Structs/GpuStructs.h>
-#include <Core/Graphics/Render.h>
-#include <Core/Graphics/Pipeline/Pipeline.h>
 
 namespace Isle
 {
@@ -15,7 +12,7 @@ namespace Isle
     CubeMesh::CubeMesh()
     {
         Build();
-        m_Material = new Material();
+        m_Material = New<Material>(); // CHANGED: Use New<> helper
     }
 
     void CubeMesh::Build()
@@ -78,7 +75,7 @@ namespace Isle
     PlaneMesh::PlaneMesh()
     {
         Build();
-        m_Material = new Material();
+        m_Material = New<Material>(); // CHANGED
     }
 
     void PlaneMesh::Build()
@@ -91,11 +88,7 @@ namespace Isle
             {{-0.5f, 0.0f, -0.5f}, {0,1,0}, {0,1}, {1,0,0}, {0,0,1}, m_Color}
         };
 
-        std::vector<unsigned int> Indices =
-        {
-            0, 1, 2,
-            2, 3, 0
-        };
+        std::vector<unsigned int> Indices = { 0, 1, 2, 2, 3, 0 };
 
         m_Bounds.m_Min = glm::vec3(FLT_MAX);
         m_Bounds.m_Max = glm::vec3(-FLT_MAX);
@@ -105,12 +98,14 @@ namespace Isle
             m_Bounds.m_Max = glm::max(m_Bounds.m_Max, v.m_Position);
         }
 
+        m_Vertices = Vertices;
+        m_Indices = Indices;
     }
 
     SphereMesh::SphereMesh()
     {
         Build();
-        m_Material = new Material();
+        m_Material = New<Material>(); // CHANGED
     }
 
     void SphereMesh::Build()
@@ -135,24 +130,16 @@ namespace Isle
                 float cosPhi = std::cos(phi);
 
                 Isle::GpuVertex vertex;
-
                 vertex.m_Position.x = radius * sinTheta * cosPhi;
                 vertex.m_Position.y = radius * cosTheta;
                 vertex.m_Position.z = radius * sinTheta * sinPhi;
-
                 vertex.m_Normal = glm::normalize(vertex.m_Position);
                 vertex.m_TexCoord.x = 1.0f - (float)segment / segments;
                 vertex.m_TexCoord.y = 1.0f - (float)ring / rings;
-
                 vertex.m_Tangent = glm::normalize(glm::vec3(
-                    -radius * sinTheta * sinPhi,
-                    0.0f,
-                    radius * sinTheta * cosPhi
-                ));
-
+                    -radius * sinTheta * sinPhi, 0.0f, radius * sinTheta * cosPhi));
                 vertex.m_BitTangent = glm::normalize(glm::cross(vertex.m_Normal, vertex.m_Tangent));
                 vertex.m_Color = m_Color;
-
                 Vertices.push_back(vertex);
             }
         }
@@ -163,11 +150,9 @@ namespace Isle
             {
                 int first = ring * (segments + 1) + segment;
                 int second = first + segments + 1;
-
                 Indices.push_back(first);
                 Indices.push_back(first + 1);
                 Indices.push_back(second);
-
                 Indices.push_back(first + 1);
                 Indices.push_back(second + 1);
                 Indices.push_back(second);
@@ -182,5 +167,7 @@ namespace Isle
             m_Bounds.m_Max = glm::max(m_Bounds.m_Max, v.m_Position);
         }
 
+        m_Vertices = Vertices;
+        m_Indices = Indices;
     }
 }

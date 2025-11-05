@@ -7,3 +7,5 @@
 #include <Core/Graphics/Mesh/StaticMesh.h>
 #include <Core/Graphics/Mesh/PrimitiveMesh.h>
 #include <Core/Input/Input.h>
+#include <Core/Scene/Scene.h>
+#include <Core/World/World.h>

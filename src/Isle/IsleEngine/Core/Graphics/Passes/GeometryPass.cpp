@@ -5,7 +5,7 @@ namespace Isle
 {
     void GeometryPass::Start()
     {
-        m_FrameBuffer = new FrameBuffer(1920, 1080);
+        m_FrameBuffer = New<FrameBuffer>(1920, 1080);
         m_FrameBuffer->AddAttachment(ATTACHMENT_TYPE::COLOR, TEXTURE_FORMAT::RGBA16F);
         m_FrameBuffer->AddAttachment(ATTACHMENT_TYPE::NORMAL, TEXTURE_FORMAT::RGBA16F);
         m_FrameBuffer->AddAttachment(ATTACHMENT_TYPE::POSITION, TEXTURE_FORMAT::RGBA32F);
@@ -29,12 +29,12 @@ namespace Isle
             ISLE_ERROR("ForwardPass framebuffer incomplete!\n");
         }
 
-        m_Shader = new Shader();
+        m_Shader = New<Shader>();
         m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "..\\Resources\\Shaders\\Geometry.frag");
         m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "..\\Resources\\Shaders\\Geometry.vert");
         m_Shader->Link();
 
-        m_PipelineState = new PipelineState();
+        m_PipelineState = New<PipelineState>();
         m_PipelineState->SetDepthTest(true);
         m_PipelineState->SetDepthWrite(true);
         m_PipelineState->SetDepthFunc(COMPARE_FUNC::LESS);

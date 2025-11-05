@@ -13,33 +13,39 @@ namespace Isle
     {
         Render::Instance()->Start();
         Input::Instance()->Start();
-        MainCamera::Instance()->Start();
-        CameraMan::Instance()->Start();
+
+        Scene::Instance()->Add(MainCamera::Instance());
+        Scene::Instance()->Add(CameraMan::Instance());
+        Scene::Instance()->Add(World::Instance());
 
         s_LastFrameTime = std::chrono::high_resolution_clock::now();
 
-        CameraMan::Instance()->m_Camera->SetPosition(glm::vec3(0, 20, 40));
-        CameraMan::Instance()->m_Camera->SetLook(glm::vec3(0, 0, 0));
+        const int cubeCount = 2;
+        const float areaSize = 10.0f;
 
-        const int cubeCount = 300;
-        const float areaSize = 50.0f;
-
-        for (int i = 0; i < cubeCount; ++i)
         {
             CubeMesh* cube = new CubeMesh();
             cube->SetColor(glm::vec4(1, 1, 1, 1));
-
-            float x = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * areaSize;
-            float y = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * areaSize * 0.2f;
-            float z = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * areaSize;
-
-            cube->SetLocalPosition(glm::vec3(x, y, z));
-
-            float s = 0.5f + ((float)rand() / RAND_MAX) * 1.5f;
-            cube->SetLocalScale(glm::vec3(s));
-
-            Render::Instance()->GetPipeline()->AddStaticMesh(cube);
+            cube->SetLocalScale(glm::vec3(1.0f));
+            World::Instance()->AddChild(cube);
         }
+
+        {
+            CubeMesh* cube = new CubeMesh();
+            cube->SetColor(glm::vec4(1, 1, 1, 1));
+            cube->SetLocalScale(glm::vec3(1.0f));
+            cube->SetLocalPosition(glm::vec3(0.0f, 2.0f, 0.0f));
+            World::Instance()->AddChild(cube);
+        }
+
+        {
+            CubeMesh* cube = new CubeMesh();
+            cube->SetColor(glm::vec4(1, 1, 1, 1));
+            cube->SetLocalScale(glm::vec3(10.0f, 0.1f, 10.0f));
+            World::Instance()->AddChild(cube);
+        }
+
+        Scene::Instance()->Start();
     }
 
     void Application::Update()
@@ -49,11 +55,9 @@ namespace Isle
         s_LastFrameTime = now;
 
         Render::Instance()->BeginFrame();
-
         Input::Instance()->Update();
-        CameraMan::Instance()->Update(m_DeltaTime);
-        MainCamera::Instance()->Update(m_DeltaTime);
-        Render::Instance()->GetPipeline()->SetCamera(MainCamera::Instance()->m_Camera);
+
+        Scene::Instance()->Update(m_DeltaTime);
 
         Render::Instance()->RenderFrame();
         Render::Instance()->EndFrame();
