@@ -1,5 +1,7 @@
 IsleEngine (WIP)
 
+IsleEngine is developed primarily for personal use. While its source code is publicly available, it is not intended as a production-ready framework. Use it at your own discretion stability, support, and completeness are not guaranteed.
+
 IsleEngine is a full-scale C++ game engine built entirely on modern OpenGL.
 
 ## Key Features
