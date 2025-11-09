@@ -10,14 +10,17 @@ namespace Isle
     {
     public:
         Ref<Texture3D> m_VoxelRadiance = nullptr;
-        Ref<Texture3D> m_VoxelNormal = nullptr;
         Ref<Texture3D> m_AtomicRadiance = nullptr;
+
+        Ref<Texture3D> m_VoxelNormal = nullptr;
+        Ref<Texture3D> m_AtomicNormal = nullptr;
+
         Ref<Texture3D> m_AtomicCounter = nullptr;
 
         Ref<Shader> m_MipmapShader = nullptr;
         Ref<Shader> m_BuildShader = nullptr;
 
-        glm::ivec3 m_Resolution = glm::ivec3(512);
+        glm::ivec3 m_Resolution = glm::ivec3(256);
         glm::ivec3 m_GridMin = glm::ivec3(-20, -5, -20);
         glm::ivec3 m_GridMax = glm::ivec3(20, 10, 20);
         glm::vec3 m_CellSize = glm::vec3(0.1);
@@ -35,5 +38,6 @@ namespace Isle
         void BuildVoxels();
         void SetupViewport();
         void SetViewport();
+        void ClearAtomics();
     };
 }

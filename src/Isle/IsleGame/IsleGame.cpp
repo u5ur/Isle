@@ -1,81 +1,112 @@
 ﻿// IsleGame.cpp
 #include "IsleGame.h"
-#include <iostream>
 #include <chrono>
 
 namespace Isle
 {
-    PrimitiveMesh* Cube_Mesh = nullptr;
-
     static std::chrono::high_resolution_clock::time_point s_LastFrameTime;
 
     void Application::Start()
     {
-        Render::Instance()->Start();
-        Input::Instance()->Start();
-
         Scene::Instance()->Add(MainCamera::Instance());
         Scene::Instance()->Add(CameraMan::Instance());
+        Scene::Instance()->Add(OrthographicCamera::Instance());
+
+        Scene::Instance()->Add(EditorCamera::Instance());
+
         Scene::Instance()->Add(World::Instance());
 
+        Scene::Instance()->Add(
+            Importer::Instance()->LoadModel(
+                "C:\\Users\\asdf\\Documents\\IsleEngineOpenGl\\source\\assets\\models\\Sponza\\scene.gltf"));
+
         s_LastFrameTime = std::chrono::high_resolution_clock::now();
-
-        const int cubeCount = 2;
-        const float areaSize = 10.0f;
-
-        {
-            CubeMesh* cube = new CubeMesh();
-            cube->SetColor(glm::vec4(1, 1, 1, 1));
-            cube->SetLocalScale(glm::vec3(1.0f));
-            World::Instance()->AddChild(cube);
-        }
-
-        {
-            CubeMesh* cube = new CubeMesh();
-            cube->SetColor(glm::vec4(1, 1, 1, 1));
-            cube->SetLocalScale(glm::vec3(1.0f));
-            cube->SetLocalPosition(glm::vec3(0.0f, 2.0f, 0.0f));
-            World::Instance()->AddChild(cube);
-        }
-
-        {
-            CubeMesh* cube = new CubeMesh();
-            cube->SetColor(glm::vec4(1, 1, 1, 1));
-            cube->SetLocalScale(glm::vec3(10.0f, 0.1f, 10.0f));
-            World::Instance()->AddChild(cube);
-        }
-
         Scene::Instance()->Start();
     }
 
     void Application::Update()
     {
         auto now = std::chrono::high_resolution_clock::now();
-        m_DeltaTime = std::chrono::duration<float>(now - s_LastFrameTime).count();
+
+        if (m_Paused)
+        {
+            m_DeltaTime = 0.0f;
+        }
+        else
+        {
+            m_DeltaTime = std::chrono::duration<float>(now - s_LastFrameTime).count();
+        }
         s_LastFrameTime = now;
 
-        Render::Instance()->BeginFrame();
-        Input::Instance()->Update();
-
-        Scene::Instance()->Update(m_DeltaTime);
-
-        Render::Instance()->RenderFrame();
-        Render::Instance()->EndFrame();
+        if (!m_IsEditorMode)
+        {
+            Render::Instance()->BeginFrame();
+            Scene::Instance()->Update(m_DeltaTime);
+            Render::Instance()->RenderFrame();
+            Render::Instance()->EndFrame();
+        }
+        else
+        {
+            Scene::Instance()->Update(m_DeltaTime);
+            Render::Instance()->RenderFrame();
+        }
     }
 
     void Application::Destroy()
     {
-        Render::Instance()->Destroy();
-        ISLE_LOG("Application Destroyed!\n");
-    }
-
-    Application* Application::Create()
-    {
-        return new Application();
+        Scene::Instance()->Destroy();
     }
 }
 
-Isle::Application* CreateApplication()
+void* CreateApplication()
 {
-    return Isle::Application::Create();
+    return new Isle::Application();
+}
+
+void DestroyApplication(void* app)
+{
+    if (app)
+    {
+        delete static_cast<Isle::Application*>(app);
+    }
+}
+
+void Application_Start(void* app)
+{
+    if (app)
+    {
+        static_cast<Isle::Application*>(app)->Start();
+    }
+}
+
+void Application_Update(void* app)
+{
+    if (app)
+    {
+        static_cast<Isle::Application*>(app)->Update();
+    }
+}
+
+void Application_Destroy(void* app)
+{
+    if (app)
+    {
+        static_cast<Isle::Application*>(app)->Destroy();
+    }
+}
+
+void Application_SetEditorMode(void* app, bool mode)
+{
+    if (app)
+    {
+        static_cast<Isle::Application*>(app)->m_IsEditorMode = mode;
+    }
+}
+
+void Application_SetPaused(void* app, bool paused)
+{
+    if (app)
+    {
+        static_cast<Isle::Application*>(app)->m_Paused = paused;
+    }
 }

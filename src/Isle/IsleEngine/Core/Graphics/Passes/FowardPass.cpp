@@ -15,8 +15,8 @@ namespace Isle
         }
 
         m_Shader = New<Shader>();
-        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "..\\Resources\\Shaders\\Forward.frag");
-        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "..\\Resources\\Shaders\\Forward.vert");
+        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "Resources\\Shaders\\Forward.frag");
+        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "Resources\\Shaders\\Forward.vert");
         m_Shader->Link();
 
         m_PipelineState = New<PipelineState>();

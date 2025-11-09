@@ -131,6 +131,34 @@ namespace Isle
 			return results;
 		}
 
+		std::vector<SceneComponent*> GetChildrenInChildren()
+		{
+			std::vector<SceneComponent*> results;
+
+			std::function<void(SceneComponent*)> traverse = [&](SceneComponent* current)
+				{
+					for (SceneComponent* child : current->m_Children)
+					{
+						if (SceneComponent* casted = dynamic_cast<SceneComponent*>(child))
+							results.push_back(casted);
+
+						traverse(child);
+					}
+				};
+
+			traverse(this);
+			return results;
+		}
+
+		void SetBounds(Bounds bounds)
+		{
+			m_Bounds = bounds;
+		}
+
+		Bounds GetBounds()
+		{
+			return m_Bounds;
+		}
 
 		size_t GetChildCount() const
 		{

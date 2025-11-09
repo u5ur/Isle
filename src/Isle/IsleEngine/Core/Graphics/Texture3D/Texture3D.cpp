@@ -87,7 +87,7 @@ namespace Isle
 
     void Texture3D::BindAsImage(GLuint unit, GLenum access, GLint level)
     {
-        glBindImageTexture(unit, m_Id, level, GL_FALSE, 0, access, ResolveInternalFormat(m_Format));
+        glBindImageTexture(unit, m_Id, level, GL_TRUE, 0, access, ResolveInternalFormat(m_Format));
         m_ImageSlot = unit;
     }
 

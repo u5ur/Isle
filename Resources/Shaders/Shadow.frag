@@ -11,17 +11,5 @@ flat in uint v_MaterialIndex;
 
 void main()
 {
-    if (v_MaterialIndex >= materials.length())
-        discard;
 
-    GpuMaterial mat = materials[v_MaterialIndex];
-
-    if (mat.m_BaseColor_TexIndex < 0)
-        return;
-
-    uint64_t handle = textureHandles[mat.m_BaseColor_TexIndex];
-    vec4 baseColor = texture(sampler2D(handle), v_TexCoord) * mat.m_BaseColorFactor;
-
-    if (baseColor.a < 0.05)
-        discard;
 }

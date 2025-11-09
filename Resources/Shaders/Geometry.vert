@@ -17,9 +17,7 @@ void main()
 {
     uint meshIndex = gl_BaseInstance;
     GpuStaticMesh mesh = meshes[meshIndex];
-
-    uint vertexIndex = mesh.m_VertexOffset + gl_VertexID;
-    GpuVertex v = vertices[vertexIndex];
+    GpuVertex v = vertices[gl_VertexID];
 
     mat3 normalMat = mat3(mesh.m_NormalMatrix);
     vec4 worldPos = mesh.m_Transform * vec4(v.m_Position, 1.0);

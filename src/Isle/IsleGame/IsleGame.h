@@ -1,33 +1,39 @@
 // IsleGame.h
 #pragma once
-
 #ifdef _WIN32
 #ifdef ISLEGAME_EXPORTS
-#define ISLEGAME_API extern "C" __declspec(dllexport)
+#define ISLEGAME_API __declspec(dllexport)
 #else
-#define ISLEGAME_API extern "C" __declspec(dllimport)
+#define ISLEGAME_API __declspec(dllimport)
 #endif
 #else
-#define ISLEGAME_API extern "C"
+#define ISLEGAME_API
 #endif
 
 #include <IsleEngine.h>
 
 namespace Isle
 {
-    class Application : public Singleton<Application>, public Component
+    class ISLEGAME_API Application : public Component
     {
         ISLE_OBJECT_CLASS(Application)
     public:
-        float m_DeltaTime;
+        float m_DeltaTime = 0.0f;
+        bool m_IsEditorMode = false;
+        bool m_Paused = false;
 
-    public:
         virtual void Start() override;
         virtual void Update() override;
         virtual void Destroy() override;
-
-        static Application* Create();
     };
 }
 
-ISLEGAME_API Isle::Application* CreateApplication();
+extern "C" {
+    ISLEGAME_API void* CreateApplication();
+    ISLEGAME_API void DestroyApplication(void* app);
+    ISLEGAME_API void Application_Start(void* app);
+    ISLEGAME_API void Application_Update(void* app);
+    ISLEGAME_API void Application_Destroy(void* app);
+    ISLEGAME_API void Application_SetEditorMode(void* app, bool mode);
+    ISLEGAME_API void Application_SetPaused(void* app, bool paused);
+}

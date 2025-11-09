@@ -13,6 +13,7 @@ namespace Isle
         Ref() = default;
         Ref(std::nullptr_t) {}
         Ref(std::shared_ptr<T> ptr) : m_Ptr(std::move(ptr)) {}
+        explicit Ref(T* ptr) : m_Ptr(ptr ? std::shared_ptr<T>(ptr, [](T*) {}) : nullptr) {}
 
         template<typename U, typename = std::enable_if_t<std::is_base_of_v<T, U>>>
         Ref(const Ref<U>& other) : m_Ptr(other.m_Ptr) {}

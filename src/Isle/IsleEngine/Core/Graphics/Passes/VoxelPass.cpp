@@ -8,18 +8,24 @@ namespace Isle
         m_VoxelRadiance->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
         m_VoxelRadiance->SetMinFilter(TEXTURE3D_FILTER::LINEAR_MIPMAP_LINEAR);
         m_VoxelRadiance->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
+        m_VoxelRadiance->SetWrap(TEXTURE3D_WRAP::CLAMP_TO_BORDER, TEXTURE3D_WRAP::CLAMP_TO_BORDER, TEXTURE3D_WRAP::CLAMP_TO_BORDER);
         m_VoxelRadiance->SetBorderColor(glm::vec4(0.0f));
-
-        m_VoxelNormal = New<Texture3D>();
-        m_VoxelNormal->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
-        m_VoxelNormal->SetMinFilter(TEXTURE3D_FILTER::LINEAR_MIPMAP_LINEAR);
-        m_VoxelNormal->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
-        m_VoxelNormal->SetBorderColor(glm::vec4(0.0f));
 
         m_AtomicRadiance = New<Texture3D>();
         m_AtomicRadiance->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
         m_AtomicRadiance->SetMinFilter(TEXTURE3D_FILTER::NEAREST);
         m_AtomicRadiance->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
+
+        m_VoxelNormal = New<Texture3D>();
+        m_VoxelNormal->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
+        m_VoxelNormal->SetMinFilter(TEXTURE3D_FILTER::LINEAR_MIPMAP_LINEAR);
+        m_VoxelNormal->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
+        m_VoxelNormal->SetBorderColor(glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
+
+        m_AtomicNormal = New<Texture3D>();
+        m_AtomicNormal->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
+        m_AtomicNormal->SetMinFilter(TEXTURE3D_FILTER::NEAREST);
+        m_AtomicNormal->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
 
         m_AtomicCounter = New<Texture3D>();
         m_AtomicCounter->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::R32UI, nullptr, true);
@@ -28,20 +34,19 @@ namespace Isle
 
         m_AtomicRadiance->Clear(glm::vec4(0.0f));
         m_AtomicCounter->Clear(glm::vec4(0.0f));
-        m_VoxelRadiance->Clear(glm::vec4(0.0f));
 
         m_Shader = New<Shader>();
-        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "..\\Resources\\Shaders\\Voxel\\Voxelize.vert");
-        m_Shader->LoadFromFile(SHADER_TYPE::GEOMETRY, "..\\Resources\\Shaders\\Voxel\\Voxelize.geom");
-        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "..\\Resources\\Shaders\\Voxel\\Voxelize.frag");
+        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "Resources\\Shaders\\Voxel\\Voxelize.vert");
+        m_Shader->LoadFromFile(SHADER_TYPE::GEOMETRY, "Resources\\Shaders\\Voxel\\Voxelize.geom");
+        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "Resources\\Shaders\\Voxel\\Voxelize.frag");
         m_Shader->Link();
 
         m_MipmapShader = New<Shader>();
-        m_MipmapShader->LoadFromFile(SHADER_TYPE::COMPUTE, "..\\Resources\\Shaders\\Voxel\\GenerateMipmaps.comp");
+        m_MipmapShader->LoadFromFile(SHADER_TYPE::COMPUTE, "Resources\\Shaders\\Voxel\\GenerateMipmaps.comp");
         m_MipmapShader->Link();
 
         m_BuildShader = New<Shader>();
-        m_BuildShader->LoadFromFile(SHADER_TYPE::COMPUTE, "..\\Resources\\Shaders\\Voxel\\BuildVoxels.comp");
+        m_BuildShader->LoadFromFile(SHADER_TYPE::COMPUTE, "Resources\\Shaders\\Voxel\\BuildVoxels.comp");
         m_BuildShader->Link();
 
         m_CellSize = glm::vec3((m_GridMax - m_GridMin)) / glm::vec3(m_Resolution);
@@ -62,7 +67,8 @@ namespace Isle
         glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
         m_AtomicRadiance->BindAsImage(0, GL_READ_WRITE, 0);
-        m_AtomicCounter->BindAsImage(1, GL_READ_WRITE, 0);
+        m_AtomicNormal->BindAsImage(1, GL_READ_WRITE, 0);
+        m_AtomicCounter->BindAsImage(2, GL_READ_WRITE, 0);
 
         m_Shader->SetIVec3("u_Resolution", m_Resolution);
         m_Shader->SetIVec3("u_GridMin", m_GridMin);
@@ -79,13 +85,31 @@ namespace Isle
 
     void VoxelPass::Destroy()
     {
+        if (m_VoxelRadiance) {
+            m_VoxelRadiance->Destroy();
+        }
 
+        if (m_VoxelNormal) {
+            m_VoxelNormal->Destroy();
+        }
+
+        if (m_AtomicRadiance) {
+            m_AtomicRadiance->Destroy();
+        }
+
+        if (m_AtomicCounter) {
+            m_AtomicCounter->Destroy();
+        }
     }
 
     void VoxelPass::GenerateMipmaps()
     {
         if (m_MipmapShader)
         {
+            glBindImageTexture(0, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA16F);
+            glBindImageTexture(1, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+            glBindImageTexture(2, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32UI);
+
             m_MipmapShader->Bind();
 
             for (int mip = 1; mip < m_MaxMipLevel; mip++)
@@ -116,15 +140,18 @@ namespace Isle
         if (m_BuildShader)
         {
             m_BuildShader->Bind();
-
             m_AtomicRadiance->BindAsImage(0, GL_READ_WRITE, 0);
-            m_VoxelRadiance->BindAsImage(1, GL_WRITE_ONLY, 0);
-            m_AtomicCounter->BindAsImage(2, GL_READ_WRITE, 0);
+            m_AtomicNormal->BindAsImage(1, GL_READ_WRITE, 0);
+            m_VoxelRadiance->BindAsImage(2, GL_WRITE_ONLY, 0);
+            m_VoxelNormal->BindAsImage(3, GL_WRITE_ONLY, 0);
+            m_AtomicCounter->BindAsImage(4, GL_READ_WRITE, 0);
 
             m_BuildShader->SetIVec3("u_Resolution", m_Resolution);
 
             glm::ivec3 groupCount = (m_Resolution + glm::ivec3(7)) / glm::ivec3(8);
             glDispatchCompute(groupCount.x, groupCount.y, groupCount.z);
+
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
     }
 

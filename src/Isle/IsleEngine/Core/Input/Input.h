@@ -1,10 +1,11 @@
 //input.h
 #pragma once
 #include <Core/Common/Common.h>
+#include <Core/Graphics/Window/Window.h>
 
 namespace Isle
 {
-	class Input : public Singleton<Input>, public Component
+	class Input : public Component
 	{
 	public:
 		enum class KeyState
@@ -38,10 +39,13 @@ namespace Isle
 		Input();
 		~Input();
 
-		virtual void Start() override;
+		void Start(Window* window = nullptr);
 		virtual void Update() override;
 		virtual void Destroy() override;
 		void Reset();
+
+		void SetWindow(Window* window);
+		GLFWwindow* GetWindow() const { return m_Window; }
 
 		void BindAction(const std::string& actionName, int key);
 		void BindAction(const std::string& actionName, MouseButton button);
@@ -80,6 +84,9 @@ namespace Isle
 		void OnScrollCallback(double xoffset, double yoffset);
 		void OnWindowFocusCallback(int focused);
 
+		static void SetInstance(Input* instance);
+		static Input* Instance();
+
 	private:
 		void UpdateKeyStates();
 		void UpdateMouseStates();
@@ -104,5 +111,7 @@ namespace Isle
 		bool m_CursorLocked;
 		bool m_FirstMouse;
 		GLFWwindow* m_Window;
+
+		static Input* s_Instance;
 	};
 }

@@ -8,6 +8,8 @@
 #include <Core/Graphics/Passes/ShadowPass.h>
 #include <Core/Graphics/Passes/FullscreenQuad.h>
 #include <Core/Graphics/Passes/VoxelPass.h>
+#include <Core/Graphics/Passes/CompositePass.h>
+#include <Core/Graphics/Passes/SelectionPass.h>
 
 namespace Isle
 {
@@ -17,7 +19,7 @@ namespace Isle
     class Light;
     class Material;
 
-    class Pipeline : public Component
+    class ISLEENGINE_API Pipeline : public Component
     {
     private:
         Ref<GfxBuffer> m_VertexBuffer;
@@ -35,7 +37,12 @@ namespace Isle
         LightingPass* m_LightingPass;
         ShadowPass* m_ShadowPass;
         VoxelPass* m_VoxelPass;
+        CompositePass* m_CompositePass;
+        SelectionPass* m_SelectionPass;
         FullscreenQuad* m_FullscreenQuad;
+
+        std::unordered_map<GLuint, uint32_t> m_TextureToIndex;
+        std::unordered_map<Material*, uint32_t> m_MaterialToIndex;
 
     public:
         virtual void Start() override;
@@ -43,13 +50,26 @@ namespace Isle
         virtual void Destroy() override;
 
         void Draw();
+        void DrawSelected();
+
         void AddIndexBuffer(std::vector<unsigned int> indices);
         void AddVertexBuffer(std::vector<GpuVertex> vertex);
         void AddStaticMesh(StaticMesh* mesh);
         void AddMaterial(Material* material);
+        void AddMaterialTexture(Material* material, std::string name);
+
+        void UpdateStaticMesh(StaticMesh* mesh);
+        void UpdateMaterial(Material* material);
+        void UpdateLight(Light* light);
+
+
         void AddLight(Light* light);
         void AddDrawCommand(Mesh* mesh);
         void SetCamera(Camera* camera);
+
+        void SelectMesh(Mesh* selectedMesh, bool state);
+
+        Ref<GfxBuffer> GetStaticMeshBuffer();
 
         int GetNumVertices();
         int GetNumIndicies();
@@ -57,5 +77,9 @@ namespace Isle
         int GetNumLights();
         int GetNumTextures();
         int GetNumStaticMeshes();
+
+
+        void Clear();
+        Ref<Texture> GetFinalOutput();
     };
 }

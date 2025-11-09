@@ -51,7 +51,6 @@ namespace Isle
         void Bind(uint32_t slot = 0) override;
         void Unbind(uint32_t slot = 0) override;
 
-        // CHANGED: Returns Ref instead of raw pointer
         Ref<Texture> AddAttachment(ATTACHMENT_TYPE type, TEXTURE_FORMAT format = TEXTURE_FORMAT::RGBA16F, bool generateMipmaps = false);
         void AttachTexture(ATTACHMENT_TYPE type, Ref<Texture> texture, int attachmentIndex = 0);
         void AttachDepthTexture(Ref<Texture> texture);
@@ -65,8 +64,10 @@ namespace Isle
         void ClearDepth(float depth = 1.0f);
         void Resize(int width, int height);
         void BlitTo(FrameBuffer* target, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
+        void BlitTo(FrameBuffer* target, const glm::ivec4& srcRect, const glm::ivec4& destRect, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
         void BlitToTexture(Ref<Texture> targetTexture, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
         void SetDebugLabel(const std::string& name);
+        void SetViewport();
 
         static GLenum ResolveAttachment(ATTACHMENT_TYPE type, int index = 0);
     };

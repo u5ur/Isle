@@ -21,20 +21,22 @@ namespace Isle
     GpuMaterial Material::GetGpuMaterial()
     {
         GpuMaterial GMaterial{};
-
         auto baseColorTex = GetTexture("BaseColor");
         auto emissiveTex = GetTexture("Emissive");
         auto metallicRoughnessTex = GetTexture("MetallicRoughness");
         auto occlusionTex = GetTexture("Occlusion");
+        auto normalTex = GetTexture("Normal");
 
         GMaterial.m_BaseColor_TexIndex = baseColorTex ? baseColorTex->m_BindlessIndex : -1;
         GMaterial.m_Emissive_TexIndex = emissiveTex ? emissiveTex->m_BindlessIndex : -1;
         GMaterial.m_MetallicRoughness_TexIndex = metallicRoughnessTex ? metallicRoughnessTex->m_BindlessIndex : -1;
         GMaterial.m_Occlusion_TexIndex = occlusionTex ? occlusionTex->m_BindlessIndex : -1;
+        GMaterial.m_Normal_TexIndex = normalTex ? normalTex->m_BindlessIndex : -1;
+
         GMaterial.m_NormalScale = m_NormalScale;
         GMaterial.m_OcclusionStrength = m_OcclusionStrength;
         GMaterial.m_MetallicFactor = m_MetallicFactor;
-        GMaterial.m_EmissiveFactor = m_EmissiveFactor;
+        GMaterial.m_EmissiveFactor = m_EmissiveFactor * m_EmissiveStrength;
         GMaterial.m_BaseColorFactor = m_BaseColorFactor;
         GMaterial.m_RoughnessFactor = m_RoughnessFactor;
         GMaterial.m_IOR = m_IOR;
@@ -48,9 +50,9 @@ namespace Isle
         return (it != m_Textures.end()) ? it->second : nullptr;
     }
 
-    void Material::SetTexture(const std::string& name, Ref<Texture> texture)
+    void Material::SetTexture(const std::string& name, Texture* texture)
     {
-        m_Textures[name] = texture;
+        m_Textures[name] = Ref<Texture>(texture);
         m_Version++;
     }
 

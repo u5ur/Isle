@@ -1,3 +1,4 @@
+// Lighting.frag
 #version 460 core
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_ARB_bindless_texture : require
@@ -13,113 +14,56 @@ uniform sampler2D u_GPosition;
 uniform sampler2D u_GMaterial;
 uniform sampler2D u_ShadowMap;
 
-uniform sampler3D u_VoxelRadiance;
-uniform sampler3D u_VoxelNormal;
+#define SHADOW_SAMPLES 16
+#define LIGHT_TYPE_DIRECTIONAL 0
+#define LIGHT_TYPE_POINT 1
+#define LIGHT_TYPE_SPOT 2
 
-uniform ivec3 u_Resolution;
-uniform ivec3 u_GridMin;
-uniform ivec3 u_GridMax;
-uniform vec3 u_CellSize;
-
-uniform float u_GIStrength = 1.0;
-uniform float u_GIMaxDistance = 20.0;
-
-#define CONE_TRACE_MIN_DIAMETER 0.5
-
-vec3 WorldToVoxelUVW(vec3 worldPos)
+// PBR Functions
+float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
-    return (worldPos - u_GridMin) / (u_GridMax - u_GridMin);
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    
+    return num / denom;
 }
 
-vec4 SampleVoxelRadianceSafe(vec3 worldPos, float lod)
+float GeometrySchlickGGX(float NdotV, float roughness)
 {
-    vec3 uvw = WorldToVoxelUVW(worldPos);
-    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
-        return vec4(0.0);
-    return textureLod(u_VoxelRadiance, uvw, lod);
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+    
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    
+    return num / denom;
 }
 
-void BuildTangentBasis(vec3 normal, out vec3 tangent, out vec3 bitangent)
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
-    vec3 up = abs(normal.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    tangent = normalize(cross(up, normal));
-    bitangent = cross(normal, tangent);
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    
+    return ggx1 * ggx2;
 }
 
-vec3 TraceDiffuseCone(vec3 origin, vec3 direction, float roughness, float maxDist)
+vec3 FresnelSchlick(float cosTheta, vec3 F0)
 {
-    vec3 radiance = vec3(0.0);
-    float totalWeight = 0.0;
-    float occlusion = 0.0;
-    
-    float coneRatio = 0.5;
-    float minVoxelDiameter = u_CellSize.x * CONE_TRACE_MIN_DIAMETER;
-    float dist = minVoxelDiameter * 3.0;
-    
-    const int MAX_STEPS = 32;
-    int step = 0;
-    
-    while (dist < maxDist && occlusion < 0.95 && step < MAX_STEPS)
-    {
-        float coneDiameter = max(2.0 * coneRatio * dist, minVoxelDiameter);
-        float lod = log2(coneDiameter / u_CellSize.x);
-        lod = clamp(lod, 0.0, 5.0);
-        
-        vec3 samplePos = origin + direction * dist;
-        vec4 voxelSample = SampleVoxelRadianceSafe(samplePos, lod);
-        
-        if (voxelSample.a > 0.01)
-        {
-            float falloff = 1.0 / (1.0 + 0.05 * dist);
-            float sampleWeight = voxelSample.a * (1.0 - occlusion) * falloff;
-            radiance += voxelSample.rgb * sampleWeight;
-            totalWeight += sampleWeight;
-            occlusion += voxelSample.a * (1.0 - occlusion) * 0.3;
-        }
-        
-        dist += coneDiameter * 1.2;
-        step++;
-    }
-    
-    if (totalWeight > 0.0)
-        radiance /= totalWeight;
-    
-    return radiance;
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
+vec2 VogelDisk(int index, float angle)
 {
-    vec3 tangent, bitangent;
-    BuildTangentBasis(normal, tangent, bitangent);
-    
-    vec3 gi = vec3(0.0);
-    float totalWeight = 0.0;
-    float maxDist = u_GIMaxDistance;
-    
-    {
-        vec3 radiance = TraceDiffuseCone(position + normal * 0.1, normal, roughness, maxDist);
-        gi += radiance * 0.3;
-        totalWeight += 0.3;
-    }
-    
-    for (int i = 0; i < 4; i++)
-    {
-        float angle = float(i) * 1.5708;
-        vec3 offset = cos(angle) * tangent + sin(angle) * bitangent;
-        vec3 coneDir = normalize(normal + offset * 0.5);
-        
-        vec3 radiance = TraceDiffuseCone(position + coneDir * 0.1, coneDir, roughness, maxDist);
-        gi += radiance * 0.175;
-        totalWeight += 0.175;
-    }
-    
-    return gi * u_GIStrength;
-}
-
-vec2 VogelDisk(int i, float angle)
-{
-    float r = sqrt(float(i) + 0.5) / sqrt(float(16));
-    float theta = float(i) * 2.4 + angle;
+    float r = sqrt(float(index) + 0.5) / sqrt(float(SHADOW_SAMPLES));
+    float theta = float(index) * 2.4 + angle;
     return vec2(cos(theta), sin(theta)) * r;
 }
 
@@ -128,90 +72,164 @@ float Noise(vec2 co)
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-float CalculateShadow(vec3 worldPos, vec3 normal, vec3 lightDir)
+float SoftShadow(vec3 worldPos, vec3 N, vec3 L, mat4 lightSpaceMatrix)
 {
-    if (lights.length() == 0)
+    vec4 lightSpace = lightSpaceMatrix * vec4(worldPos, 1.0);
+    vec3 proj = lightSpace.xyz / lightSpace.w;
+    proj = proj * 0.5 + 0.5;
+    
+    if (proj.z > 1.0 || any(lessThan(proj.xy, vec2(0.0))) || any(greaterThan(proj.xy, vec2(1.0))))
         return 0.0;
     
-    GpuLight light = lights[0];
+    float NdotL = max(dot(N, normalize(-L)), 0.0);
+    float bias = mix(0.0005, 0.002, 1.0 - NdotL);
     
-    vec4 lightSpacePos = light.m_LightSpaceMatrix * vec4(worldPos, 1.0);
-    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
-    projCoords = projCoords * 0.5 + 0.5;
-    
-    if (projCoords.z > 1.0 || any(lessThan(projCoords.xy, vec2(0.0))) || any(greaterThan(projCoords.xy, vec2(1.0))))
-        return 0.0;
-    
-    float NdotL = max(dot(normal, -lightDir), 0.0);
-    float bias = mix(0.005, 0.0005, NdotL);
+    float angle = Noise(gl_FragCoord.xy) * 6.28318;
     
     float shadow = 0.0;
-    float angle = Noise(gl_FragCoord.xy) * 6.28318530718;
-    float filterRadius = 0.002;
+    float filterSize = 0.002;
     
-    for (int i = 0; i < 16; i++)
-    {
-        vec2 offset = VogelDisk(i, angle) * filterRadius;
-        float shadowDepth = texture(u_ShadowMap, projCoords.xy + offset).r;
-        shadow += (shadowDepth < projCoords.z - bias) ? 1.0 : 0.0;
+    for (int i = 0; i < SHADOW_SAMPLES; i++) {
+        vec2 offset = VogelDisk(i, angle) * filterSize;
+        float depth = texture(u_ShadowMap, proj.xy + offset).r;
+        shadow += (depth < proj.z - bias) ? 1.0 : 0.0;
     }
-    shadow /= 16.0;
     
-    vec2 fadeFactor = smoothstep(0.0, 0.05, projCoords.xy) * (1.0 - smoothstep(0.95, 1.0, projCoords.xy));
-    shadow *= fadeFactor.x * fadeFactor.y;
-    shadow *= 1.0 - smoothstep(0.95, 1.0, projCoords.z);
+    shadow /= float(SHADOW_SAMPLES);
+    
+    vec2 fade = smoothstep(0.0, 0.05, proj.xy) * (1.0 - smoothstep(0.95, 1.0, proj.xy));
+    shadow *= fade.x * fade.y;
+    
+    shadow *= 1.0 - smoothstep(0.95, 1.0, proj.z);
     
     return shadow;
 }
 
-vec3 CalculateDirectionalLight(GpuLight light, vec3 albedo, float metallic, float roughness, vec3 normal, vec3 viewDir, vec3 worldPos)
+vec3 CalculateDirectionalLight(GpuLight light, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V, vec3 worldPos, bool useShadow)
 {
-    vec3 lightDir = normalize(-light.m_Direction);
-    vec3 halfDir = normalize(viewDir + lightDir);
-    
+    vec3 L = normalize(-light.m_Direction);
+    vec3 H = normalize(V + L);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     
-    float NDF = DistributionGGX(normal, halfDir, roughness);
-    float G = GeometrySmith(normal, viewDir, -lightDir, roughness);
-    vec3 F = FresnelSchlick(max(dot(halfDir, viewDir), 0.0), F0);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
     
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, -lightDir), 0.0) + 0.0001;
-    vec3 specular = numerator / denominator;
+    vec3 specular = (NDF * G * F) / max(4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001, 0.0001);
     
     vec3 kS = F;
     vec3 kD = (1.0 - kS) * (1.0 - metallic);
     
-    float NdotL = max(dot(normal, -lightDir), 0.0);
-    float shadowFactor = CalculateShadow(worldPos, normal, lightDir);
+    float NdotL = max(dot(N, L), 0.0);
     
-    vec3 radiance = light.m_Color * light.m_Intensity;
-    return (kD * albedo / PI + specular) * radiance * NdotL * (1.0 - shadowFactor);
+    float shadow = 0.0;
+    if (useShadow) {
+        shadow = SoftShadow(worldPos, N, light.m_Direction, light.m_LightSpaceMatrix);
+    }
+    
+    return (kD * albedo / PI + specular) * light.m_Color * light.m_Intensity * NdotL * (1.0 - shadow);
+}
+
+vec3 CalculatePointLight(GpuLight light, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V, vec3 worldPos)
+{
+    vec3 L = normalize(light.m_Position - worldPos);
+    vec3 H = normalize(V + L);
+    float distance = length(light.m_Position - worldPos);
+    
+    float attenuation = 1.0;
+    if (light.m_Radius > 0.0) {
+        attenuation = clamp(1.0 - (distance / light.m_Radius), 0.0, 1.0);
+        attenuation = attenuation * attenuation;
+    } else {
+        attenuation = 1.0 / (distance * distance + 1.0);
+    }
+    
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    
+    vec3 specular = (NDF * G * F) / max(4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001, 0.0001);
+    
+    vec3 kS = F;
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+    
+    float NdotL = max(dot(N, L), 0.0);
+    
+    return (kD * albedo / PI + specular) * light.m_Color * light.m_Intensity * attenuation * NdotL;
+}
+
+vec3 CalculateSpotLight(GpuLight light, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V, vec3 worldPos)
+{
+    vec3 L = normalize(light.m_Position - worldPos);
+    vec3 H = normalize(V + L);
+    float distance = length(light.m_Position - worldPos);
+    
+    float attenuation = 1.0;
+    if (light.m_Radius > 0.0) {
+        attenuation = clamp(1.0 - (distance / light.m_Radius), 0.0, 1.0);
+        attenuation = attenuation * attenuation;
+    } else {
+        attenuation = 1.0 / (distance * distance + 1.0);
+    }
+    
+    vec3 spotDir = normalize(-light.m_Direction);
+    float theta = dot(L, spotDir);
+    float epsilon = light.m_ConeAngles.x - light.m_ConeAngles.y;
+    float intensity = clamp((theta - light.m_ConeAngles.y) / epsilon, 0.0, 1.0);
+    intensity = intensity * intensity;
+    
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    
+    vec3 specular = (NDF * G * F) / max(4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001, 0.0001);
+    
+    vec3 kS = F;
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+    
+    float NdotL = max(dot(N, L), 0.0);
+    
+    return (kD * albedo / PI + specular) * light.m_Color * light.m_Intensity * attenuation * intensity * NdotL;
 }
 
 void main()
 {
-    vec4 albedo = texture(u_GColor, TexCoord);
-    vec3 normal = normalize(texture(u_GNormal, TexCoord).xyz * 2.0 - 1.0);
+    vec4 albedoTex = texture(u_GColor, TexCoord);
+    vec3 normal = texture(u_GNormal, TexCoord).xyz;
     vec3 worldPos = texture(u_GPosition, TexCoord).xyz;
-    vec4 materialData = texture(u_GMaterial, TexCoord);
-
-    float metallic = materialData.r;
-    float roughness = materialData.g;
-
-    vec3 viewDir = normalize(camera.m_Position - worldPos);
-
-    vec3 Lo = albedo.rgb * 0.03;
-    if (lights.length() > 0)
-        Lo += CalculateDirectionalLight(lights[0], albedo.rgb, metallic, roughness, normal, viewDir, worldPos);
-
-    vec3 indirectDiffuse = ComputeIndirectDiffuse(worldPos, normal, roughness);
-    vec3 kD = vec3(1.0 - metallic);
-    Lo += indirectDiffuse * albedo.rgb * kD;
-
-//   vec3 uvw = WorldToVoxelUVW(worldPos);
-//        if (all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0))))
-//            Lo = textureLod(u_VoxelRadiance, uvw, 0.0).rgb;
-
-    FragColor = vec4(Lo, albedo.a);
+    vec4 material = texture(u_GMaterial, TexCoord);
+    
+    float metallic = material.r;
+    float roughness = material.g;
+    float ao = material.b;
+    float emissive = material.a;
+    
+    vec3 N = normalize(normal);
+    vec3 V = normalize(camera.m_Position - worldPos);
+    
+    vec3 Lo = vec3(0.0);   
+    //Lo += albedoTex.rgb;
+    
+    for (int i = 0; i < lights.length(); i++)
+    {
+        GpuLight light = lights[0];
+        
+        if (light.m_Type == LIGHT_TYPE_DIRECTIONAL)
+        {
+            bool useShadow = (i == 0);
+            Lo += CalculateDirectionalLight(light, albedoTex.rgb, metallic, roughness, N, V, worldPos, useShadow);
+        }
+        else if (light.m_Type == LIGHT_TYPE_POINT)
+        {
+            Lo += CalculatePointLight(light, albedoTex.rgb, metallic, roughness, N, V, worldPos);
+        }
+        else if (light.m_Type == LIGHT_TYPE_SPOT)
+        {
+            Lo += CalculateSpotLight(light, albedoTex.rgb, metallic, roughness, N, V, worldPos);
+        }
+    }
+    
+    FragColor = vec4(Lo, albedoTex.a);
 }

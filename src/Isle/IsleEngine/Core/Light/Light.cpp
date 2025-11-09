@@ -21,12 +21,12 @@ namespace Isle
         m_ProjectionMatrix = glm::mat4(1.0f);
         m_Dir = glm::normalize(glm::vec3(-0.1f, -1.0f, 0.15f));
         m_Color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        m_Intensity = 1.0f;
+        m_Intensity = 3.0f;
     }
 
     glm::mat4 DirectionalLight::GetLightSpaceMatrix()
     {
-        float orthoSize = 10.0f;
+        float orthoSize = 20.0f;
         float nearPlane = 0.1f;
         float farPlane = 150.0f;
 

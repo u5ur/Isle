@@ -7,83 +7,150 @@
 
 namespace Isle
 {
-	void Scene::Start()
-	{
-		auto children = GetChildren();
+    void Scene::Start()
+    {
+        auto children = GetChildren();
 
-		for (auto& child : children)
-		{
-			StartComponent(child);
-		}
-	}
+        for (auto& child : children)
+        {
+            StartComponent(child);
+        }
 
-	void Scene::Update(float delta_time)
-	{
-		auto children = GetChildren();
+        m_NeedsPipelineUpload = true;
+    }
 
-		for (auto& child : children)
-		{
-			UpdateComponent(child, delta_time);
-		}
-	}
+    void Scene::Update(float delta_time)
+    {
+        auto children = GetChildren();
 
-	void Scene::Destroy()
-	{
+        for (auto& child : children)
+        {
+            UpdateComponent(child, delta_time);
+        }
+    }
 
-	}
+    void Scene::Destroy()
+    {
+        for (SceneComponent* child : m_Children)
+        {
+            DestroyComponent(child);
+        }
+        m_Children.clear();
+    }
 
-	void Scene::Add(SceneComponent* component)
-	{
-		AddChild(component);
-	}
+    void Scene::Add(SceneComponent* component)
+    {
+        if (!component)
+            return;
 
-	void Scene::Remove(SceneComponent* component)
-	{
-		RemoveChild(component);
-	}
+        AddChild(component);
+        m_NeedsPipelineUpload = true;
+    }
 
-	void Scene::StartComponent(SceneComponent* component)
-	{
-		component->Start();
+    void Scene::Remove(SceneComponent* component)
+    {
+        RemoveChild(component);
+        m_NeedsPipelineUpload = true;
+    }
 
-		if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(component))
-		{
-			Render::Instance()->GetPipeline()->AddStaticMesh(mesh);
-		}
-		else if (Light* light = dynamic_cast<Light*>(component))
-		{
-			Render::Instance()->GetPipeline()->AddLight(light);
-		}
-		else if (Camera* camera = dynamic_cast<Camera*>(component))
-		{
-			Render::Instance()->GetPipeline()->SetCamera(camera);
-		}
+    void Scene::UploadToPipeline()
+    {
+        auto pipeline = Render::Instance()->GetPipeline();
+        if (!pipeline)
+        {
+            ISLE_ERROR("No pipeline available for scene upload\n");
+            return;
+        }
 
-		auto children = component->GetChildren();
-		for (auto& child : children)
-		{
-			StartComponent(child);
-		}
-	}
+        auto children = GetChildren();
+        for (auto& child : children)
+        {
+            UploadComponentToPipeline(child);
+        }
 
-	void Scene::UpdateComponent(SceneComponent* component, float delta_time)
-	{
-		component->Update(delta_time);
+        m_NeedsPipelineUpload = false;
+    }
 
-		if (Camera* camera = dynamic_cast<Camera*>(component))
-		{
-			Render::Instance()->GetPipeline()->SetCamera(camera);
-		}
+    void Scene::UploadComponentToPipeline(SceneComponent* component)
+    {
+        auto pipeline = Render::Instance()->GetPipeline();
+        if (!pipeline) return;
 
-		auto children = component->GetChildren();
-		for (auto& child : children)
-		{
-			UpdateComponent(child, delta_time);
-		}
-	}
+        if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(component))
+        {
+            pipeline->AddStaticMesh(mesh);
+        }
+        else if (Light* light = dynamic_cast<Light*>(component))
+        {
+            pipeline->AddLight(light);
+        }
+        else if (Camera* camera = dynamic_cast<Camera*>(component))
+        {
+            pipeline->SetCamera(camera);
+        }
 
-	void Scene::DestroyComponent(SceneComponent* component)
-	{
+        auto children = component->GetChildren();
+        for (auto& child : children)
+        {
+            UploadComponentToPipeline(child);
+        }
+    }
 
-	}
+    void Scene::StartComponent(SceneComponent* component)
+    {
+        if (!component)
+            return;
+
+        component->Start();
+
+        auto children = component->GetChildren();
+        for (auto& child : children)
+        {
+            StartComponent(child);
+        }
+    }
+
+    void Scene::UpdateComponent(SceneComponent* component, float delta_time)
+    {
+        if (!component)
+            return;
+
+        component->Update(delta_time);
+
+        auto pipeline = Render::Instance()->GetPipeline();
+        if (pipeline)
+        {
+            if (Camera* camera = dynamic_cast<Camera*>(component))
+            {
+                pipeline->SetCamera(camera);
+            }
+            else if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(component))
+            {
+                pipeline->UpdateStaticMesh(mesh);
+            }
+            else if (Light* light = dynamic_cast<Light*>(component))
+            {
+                pipeline->UpdateLight(light);
+            }
+        }
+
+        auto children = component->GetChildren();
+        for (auto& child : children)
+        {
+            UpdateComponent(child, delta_time);
+        }
+    }
+
+    void Scene::DestroyComponent(SceneComponent* component)
+    {
+        if (!component) return;
+
+        auto children = component->GetChildren();
+        for (SceneComponent* child : children)
+        {
+            DestroyComponent(child);
+        }
+
+        delete component;
+    }
 }

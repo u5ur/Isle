@@ -7,6 +7,7 @@ namespace Isle
 	class Light : public SceneComponent
 	{
 	public:
+		int m_Id = -1;
 		glm::mat4 m_ViewMatrix;
 		glm::mat4 m_ProjectionMatrix;
 

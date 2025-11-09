@@ -5,10 +5,10 @@
 
 namespace Isle
 {
-	class CameraMan : public Singleton<CameraMan>, public SceneComponent
+	class ISLEENGINE_API CameraMan : public Singleton<CameraMan>, public SceneComponent
 	{
 	public:
-		bool m_UseCameraMan = false;
+		Camera* m_Camera;
 
 	public:
 		virtual void Start() override;

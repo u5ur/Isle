@@ -1,5 +1,6 @@
 // IsleEngine.h
 #pragma once
+#include <Core/Common/Common.h>
 #include <Core/Graphics/Render.h>
 #include <Core/Graphics/Window/Window.h>
 #include <Core/Camera/MainCamera.h>
@@ -9,3 +10,7 @@
 #include <Core/Input/Input.h>
 #include <Core/Scene/Scene.h>
 #include <Core/World/World.h>
+#include <Core/Graphics/Texture/Texture.h>
+#include <Core/Importer/Importer.h>
+#include <Core/Camera/EditorCamera.h>
+#include <Core/Camera/OrthographicCamera.h>

@@ -98,6 +98,7 @@ namespace Isle
             m_LocalData.resize(data.size() * sizeof(T));
             std::memcpy(m_LocalData.data(), data.data(), m_LocalData.size());
             m_Dirty = true;
+            m_SizeInBytes = m_LocalData.size();
         }
 
         template<typename T>

@@ -12,6 +12,9 @@ namespace Isle
         virtual void Start() override;
         virtual void Update() override;
         virtual void Destroy() override;
+
+        Ref<Texture> GetOutputTexture();
+        void BlitToScreen();
     };
 }
 

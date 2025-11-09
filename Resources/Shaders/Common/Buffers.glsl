@@ -6,5 +6,4 @@ layout(std430, binding = 2) readonly buffer MaterialBuffer { GpuMaterial materia
 layout(std430, binding = 3) readonly buffer MeshBuffer { GpuStaticMesh meshes[]; };
 layout(std430, binding = 4) readonly buffer LightBuffer { GpuLight lights[]; };
 layout(std140, binding = 5) uniform CameraBuffer { GpuCamera camera; };
-layout(std430, binding = 6) buffer DrawCommandBuffer { GpuDrawCommand drawCommands[]; };
-layout(std430, binding = 7) readonly buffer TextureHandleBuffer { uint64_t textureHandles[]; };
+layout(std430, binding = 6) readonly buffer TextureHandleBuffer { uint64_t textureHandles[]; };

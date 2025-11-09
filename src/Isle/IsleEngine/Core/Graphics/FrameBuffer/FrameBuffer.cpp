@@ -69,9 +69,7 @@ namespace Isle
             format = TEXTURE_FORMAT::DEPTH24_STENCIL8;
         }
 
-        // CHANGED: Create texture with Ref
         auto texture = New<Texture>();
-
         if (type == ATTACHMENT_TYPE::SHADOW_MAP)
         {
             texture->Create(m_Width, m_Height, TEXTURE_FORMAT::DEPTH32F, nullptr, false);
@@ -84,9 +82,14 @@ namespace Isle
 
             GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
             glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture->m_Id, 0);
+
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
+
             texture->Unbind();
         }
         else
@@ -190,10 +193,27 @@ namespace Isle
     void FrameBuffer::Clear(const glm::vec4& color, float depth, int stencil)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
-        glClearColor(color.r, color.g, color.b, color.a);
+
+        if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
+            glClearColor(color.r, color.g, color.b, color.a);
+        }
+
         glClearDepth(depth);
         glClearStencil(stencil);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        GLbitfield clearBits = 0;
+        if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
+            clearBits |= GL_COLOR_BUFFER_BIT;
+        }
+        if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH) ||
+            m_Attachments.count(ATTACHMENT_TYPE::SHADOW_MAP)) {
+            clearBits |= GL_DEPTH_BUFFER_BIT;
+        }
+        if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH_STENCIL)) {
+            clearBits |= GL_STENCIL_BUFFER_BIT;
+        }
+
+        glClear(clearBits);
     }
 
     void FrameBuffer::ClearColor(const glm::vec4& color)
@@ -236,6 +256,29 @@ namespace Isle
         glBlitFramebuffer(0, 0, m_Width, m_Height,
             0, 0, targetWidth, targetHeight, mask, filter);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+
+    void FrameBuffer::BlitTo(FrameBuffer* target, const glm::ivec4& srcRect, const glm::ivec4& destRect,
+        GLbitfield mask, GLenum filter)
+    {
+        GLuint targetId = target ? target->m_Id : 0;
+
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, m_Id);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, targetId);
+
+        glBlitFramebuffer(
+            srcRect.x, srcRect.y, srcRect.z, srcRect.w,
+            destRect.x, destRect.y, destRect.z, destRect.w,
+            mask, filter
+        );
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    void FrameBuffer::SetViewport()
+    {
+        glViewport(0, 0, m_Width, m_Height);
     }
 
     void FrameBuffer::BlitToTexture(Ref<Texture> targetTexture, GLbitfield mask, GLenum filter)

@@ -61,7 +61,8 @@ namespace Isle
         int m_Channels = 0;
         int m_Slot = -1;
         int m_ImageSlot = -1;
-        int m_BindlessIndex = -1;
+        uint32_t m_BindlessIndex = -1;
+        uint64_t m_BindlessHandle = 0;
 
         TEXTURE_FORMAT m_Format = TEXTURE_FORMAT::RGBA8;
         TEXTURE_FILTER m_MinFilter = TEXTURE_FILTER::LINEAR;
@@ -75,6 +76,12 @@ namespace Isle
     public:
         Texture() = default;
         ~Texture() override;
+
+        Texture(int width, int height, TEXTURE_FORMAT format, bool generateMipmaps = false)
+        {
+            Create(width, height, format, nullptr, generateMipmaps);
+        }
+
 
         void Create(int width, int height, TEXTURE_FORMAT format,
                    const void* data = nullptr, bool generateMipmaps = false);
@@ -101,9 +108,11 @@ namespace Isle
         void Download(void* outData, int level = 0) const;
         void GenerateMipmaps();
         void Resize(int width, int height);
+        uint64_t GetBindlessHandle();
 
         void SetDebugLabel(const std::string& name);
 
+        static int CalculateTextureSize(int width, int height, TEXTURE_FORMAT format);
         static GLenum ResolveInternalFormat(TEXTURE_FORMAT format);
         static GLenum ResolveFormat(TEXTURE_FORMAT format);
         static GLenum ResolveDataType(TEXTURE_FORMAT format);

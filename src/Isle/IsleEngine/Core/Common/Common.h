@@ -1,7 +1,6 @@
 #pragma once
 #define GLM_ENABLE_EXPERIMENTAL
 #define NOMINMAX
-#define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <cstdio>
 #include <iostream>
@@ -15,8 +14,11 @@
 #include <functional>
 #include <mutex>
 
+#define GLFW_EXPOSE_NATIVE_WIN32
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -27,13 +29,6 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/quaternion.hpp>
-
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
-#include <imgui/imgui_impl_win32.h>
-#include <imgui/imgui_impl_opengl3.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/ImGuizmo.h>
 
 #include "Object/Object.h"
 #include "Memory/Ref.h"
@@ -134,3 +129,17 @@ inline bool HasAnsiSupport()
             outStr = _ss.str();                            \
         }                                                  \
     } while (0)
+
+#include "Reflection/Reflection.h"
+
+#pragma once
+
+#ifdef _WIN32
+#ifdef ISLEENGINE_EXPORTS
+#define ISLEENGINE_API __declspec(dllexport)
+#else
+#define ISLEENGINE_API __declspec(dllimport)
+#endif
+#else
+#define ISLEENGINE_API
+#endif

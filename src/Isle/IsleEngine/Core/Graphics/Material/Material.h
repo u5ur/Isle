@@ -11,6 +11,7 @@ namespace Isle
     class Material : public Object
     {
     public:
+        int m_Id = -1;
         uint32_t m_Version = 0;
 
         Ref<Shader> m_Shader = nullptr;
@@ -34,7 +35,7 @@ namespace Isle
         GpuMaterial GetGpuMaterial();
 
         Ref<Texture> GetTexture(const std::string& name);
-        void SetTexture(const std::string& name, Ref<Texture> texture);
+        void SetTexture(const std::string& name, Texture* texture);
         void SetShader(Ref<Shader> shader) { m_Shader = shader; m_Version++; }
         void SetPipelineState(Ref<PipelineState> state) { m_PipelineState = state; m_Version++; }
 

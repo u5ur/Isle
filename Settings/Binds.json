@@ -1,0 +1,71 @@
+{
+  "Forward": [
+    { "keys": [87], "mouseButtons": [] }
+  ],
+  "Backward": [
+    { "keys": [83], "mouseButtons": [] }
+  ],
+  "Left": [
+    { "keys": [65], "mouseButtons": [] }
+  ],
+  "Right": [
+    { "keys": [68], "mouseButtons": [] }
+  ],
+  "Jump": [
+    { "keys": [32], "mouseButtons": [] }
+  ],
+  "Sprint": [
+    { "keys": [340], "mouseButtons": [] }
+  ],
+  "Interact": [
+    { "keys": [69], "mouseButtons": [] }
+  ],
+  "Pause": [
+    { "keys": [256], "mouseButtons": [] }
+  ],
+  "Delete": [
+    { "keys": [88], "mouseButtons": [] }
+  ],
+  "Copy": [
+    { "keys": [341, 67], "mouseButtons": [] }
+  ],
+  "Paste": [
+    { "keys": [341, 86], "mouseButtons": [] }
+  ],
+  "Undo": [
+    { "keys": [341, 90], "mouseButtons": [] }
+  ],
+  "Redo": [
+    { "keys": [341, 89], "mouseButtons": [] }
+  ],
+  "SelectAll": [
+    { "keys": [341, 65], "mouseButtons": [] }
+  ],
+  "DeselectAll": [
+    { "keys": [341, 68], "mouseButtons": [] }
+  ],
+  "Duplicate": [
+    { "keys": [341, 68], "mouseButtons": [] }
+  ],
+  "Focus": [
+    { "keys": [70], "mouseButtons": [] }
+  ],
+  "Aim": [
+    { "keys": [], "mouseButtons": [1] }
+  ],
+  "Attack": [
+    { "keys": [], "mouseButtons": [0] }
+  ],
+  "Reload": [
+    { "keys": [82], "mouseButtons": [] }
+  ],
+  "EquipFists": [
+    { "keys": [49], "mouseButtons": [] }
+  ],
+  "EquipPistol": [
+    { "keys": [50], "mouseButtons": [] }
+  ],
+  "Inspect": [
+    { "keys": [73], "mouseButtons": [] }
+  ]
+}

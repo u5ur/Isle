@@ -14,8 +14,8 @@ namespace Isle
         }
 
         m_Shader = New<Shader>();
-        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "..\\Resources\\Shaders\\Shadow.frag");
-        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "..\\Resources\\Shaders\\Shadow.vert");
+        m_Shader->LoadFromFile(SHADER_TYPE::FRAGMENT, "Resources\\Shaders\\Shadow.frag");
+        m_Shader->LoadFromFile(SHADER_TYPE::VERTEX, "Resources\\Shaders\\Shadow.vert");
         m_Shader->Link();
 
         m_PipelineState = New<PipelineState>();
@@ -32,6 +32,7 @@ namespace Isle
     void ShadowPass::Bind()
     {
         m_FrameBuffer->Bind();
+        m_FrameBuffer->ClearDepth();
         m_FrameBuffer->Clear();
 
         m_Shader->Bind();

@@ -1,6 +1,6 @@
 // Texture.cpp
 #include "Texture.h"
-//#include <stb_image.h>
+#include <stb_image.h>
 
 namespace Isle
 {
@@ -10,7 +10,7 @@ namespace Isle
     }
 
     void Texture::Create(int width, int height, TEXTURE_FORMAT format,
-                        const void* data, bool generateMipmaps)
+        const void* data, bool generateMipmaps)
     {
         m_Width = width;
         m_Height = height;
@@ -23,11 +23,24 @@ namespace Isle
         glBindTexture(GL_TEXTURE_2D, m_Id);
 
         GLenum internalFormat = ResolveInternalFormat(format);
-        GLenum dataFormat = ResolveFormat(format);
+        GLenum pixelFormat = ResolveFormat(format);
         GLenum dataType = ResolveDataType(format);
 
+        if (format == TEXTURE_FORMAT::DEPTH16 ||
+            format == TEXTURE_FORMAT::DEPTH24 ||
+            format == TEXTURE_FORMAT::DEPTH32 ||
+            format == TEXTURE_FORMAT::DEPTH32F)
+        {
+            pixelFormat = GL_DEPTH_COMPONENT;
+        }
+        else if (format == TEXTURE_FORMAT::DEPTH24_STENCIL8 ||
+            format == TEXTURE_FORMAT::DEPTH32F_STENCIL8)
+        {
+            pixelFormat = GL_DEPTH_STENCIL;
+        }
+
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
-                    dataFormat, dataType, data);
+            pixelFormat, dataType, data);
 
         SetMinFilter(m_MinFilter);
         SetMagFilter(m_MagFilter);
@@ -40,37 +53,35 @@ namespace Isle
         glBindTexture(GL_TEXTURE_2D, 0);
 
         m_IsLoaded = true;
-        m_SizeInBytes = width * height * 4; // Approximate
+        m_SizeInBytes = CalculateTextureSize(width, height, format);
     }
 
     void Texture::CreateFromFile(const std::string& path, bool generateMipmaps)
     {
-        // int width, height, channels;
-        // stbi_set_flip_vertically_on_load(true);
-        // unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
-        //
-        // if (!data)
-        // {
-        //     ISLE_ERROR("Failed to load texture: %s\n", path.c_str());
-        //     return;
-        // }
-        //
-        // TEXTURE_FORMAT format;
-        // switch (channels)
-        // {
-        //     case 1: format = TEXTURE_FORMAT::R8; break;
-        //     case 2: format = TEXTURE_FORMAT::RG8; break;
-        //     case 3: format = TEXTURE_FORMAT::RGB8; break;
-        //     case 4: format = TEXTURE_FORMAT::RGBA8; break;
-        //     default: format = TEXTURE_FORMAT::RGBA8; break;
-        // }
-        //
-        // m_Channels = channels;
-        // Create(width, height, format, data, generateMipmaps);
-        //
-        // stbi_image_free(data);
-        // ISLE_SUCCESS("Loaded texture: %s (%dx%d, %d channels)\n",
-        //             path.c_str(), width, height, channels);
+         int width, height, channels;
+         stbi_set_flip_vertically_on_load(true);
+         unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+        
+         if (!data)
+         {
+             ISLE_ERROR("Failed to load texture: %s\n", path.c_str());
+             return;
+         }
+        
+         TEXTURE_FORMAT format;
+         switch (channels)
+         {
+             case 1: format = TEXTURE_FORMAT::R8; break;
+             case 2: format = TEXTURE_FORMAT::RG8; break;
+             case 3: format = TEXTURE_FORMAT::RGB8; break;
+             case 4: format = TEXTURE_FORMAT::RGBA8; break;
+             default: format = TEXTURE_FORMAT::RGBA8; break;
+         }
+        
+         m_Channels = channels;
+         Create(width, height, format, data, generateMipmaps);
+        
+         stbi_image_free(data);
     }
 
     void Texture::Destroy()
@@ -187,6 +198,16 @@ namespace Isle
         GLenum type = ResolveDataType(m_Format);
         glGetTexImage(GL_TEXTURE_2D, level, format, type, outData);
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    uint64_t Texture::GetBindlessHandle()
+    {
+        if (!m_BindlessHandle)
+        {
+            m_BindlessHandle = glGetTextureHandleARB(m_Id);
+            glMakeTextureHandleResidentARB(m_BindlessHandle);
+        }
+        return m_BindlessHandle;
     }
 
     void Texture::GenerateMipmaps()
@@ -351,5 +372,35 @@ namespace Isle
             case TEXTURE_WRAP::MIRROR_CLAMP_TO_EDGE: return GL_MIRROR_CLAMP_TO_EDGE;
             default: return GL_REPEAT;
         }
+    }
+
+    int Texture::CalculateTextureSize(int width, int height, TEXTURE_FORMAT format)
+    {
+        int bytesPerPixel = 4;
+
+        switch (format)
+        {
+        case TEXTURE_FORMAT::R8: bytesPerPixel = 1; break;
+        case TEXTURE_FORMAT::RG8: bytesPerPixel = 2; break;
+        case TEXTURE_FORMAT::RGB8: bytesPerPixel = 3; break;
+        case TEXTURE_FORMAT::RGBA8: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::R16F: bytesPerPixel = 2; break;
+        case TEXTURE_FORMAT::RG16F: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::RGB16F: bytesPerPixel = 6; break;
+        case TEXTURE_FORMAT::RGBA16F: bytesPerPixel = 8; break;
+        case TEXTURE_FORMAT::R32F: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::RG32F: bytesPerPixel = 8; break;
+        case TEXTURE_FORMAT::RGB32F: bytesPerPixel = 12; break;
+        case TEXTURE_FORMAT::RGBA32F: bytesPerPixel = 16; break;
+        case TEXTURE_FORMAT::DEPTH16: bytesPerPixel = 2; break;
+        case TEXTURE_FORMAT::DEPTH24: bytesPerPixel = 3; break;
+        case TEXTURE_FORMAT::DEPTH32: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::DEPTH32F: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::DEPTH24_STENCIL8: bytesPerPixel = 4; break;
+        case TEXTURE_FORMAT::DEPTH32F_STENCIL8: bytesPerPixel = 8; break;
+        default: bytesPerPixel = 4; break;
+        }
+
+        return width * height * bytesPerPixel;
     }
 }

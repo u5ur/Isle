@@ -3,20 +3,24 @@
 
 namespace Isle
 {
-	class Scene : public Singleton<Scene>, public SceneComponent
-	{
-	public:
-		virtual void Start() override;
-		virtual void Update(float delta_time) override;
-		virtual void Destroy() override;
+    class ISLEENGINE_API Scene : public Singleton<Scene>, public SceneComponent
+    {
+    private:
+        bool m_NeedsPipelineUpload = true;
 
-		void Add(SceneComponent* component);
-		void Remove(SceneComponent* component);
+    public:
+        virtual void Start() override;
+        virtual void Update(float delta_time) override;
+        virtual void Destroy() override;
 
-	private:
-		void StartComponent(SceneComponent* component);
-		void UpdateComponent(SceneComponent* component, float delta_time);
-		void DestroyComponent(SceneComponent* component);
+        void Add(SceneComponent* component);
+        void Remove(SceneComponent* component);
+        void UploadToPipeline();
 
-	};
+    private:
+        void StartComponent(SceneComponent* component);
+        void UpdateComponent(SceneComponent* component, float delta_time);
+        void DestroyComponent(SceneComponent* component);
+        void UploadComponentToPipeline(SceneComponent* component);
+    };
 }

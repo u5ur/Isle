@@ -6,50 +6,47 @@
 
 namespace Isle
 {
-    static void CharCallback(GLFWwindow* window, unsigned int codepoint)
+    Input* Input::s_Instance = nullptr;
+
+    Input* Input::Instance()
     {
- 	    ImGui_ImplGlfw_CharCallback(window, codepoint);
+        if (!s_Instance)
+        {
+            s_Instance = new Input();
+        }
+
+
+        return s_Instance;
+    }
+
+    void Input::SetInstance(Input* instance)
+    {
+        s_Instance = instance;
     }
 
     static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
     {
- 	    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-
- 	    ImGuiIO& io = ImGui::GetIO();
- 	    if (!io.WantCaptureKeyboard) {
- 		    Input::Instance()->OnMouseButtonCallback(button, action, mods);
- 	    }
+        Input::Instance()->OnMouseButtonCallback(button, action, mods);
     }
 
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
     {
- 	    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-
- 	    ImGuiIO& io = ImGui::GetIO();
- 	    if (!io.WantCaptureKeyboard) {
- 		    Input::Instance()->OnKeyCallback(key, scancode, action, mods);
- 	    }
+        Input::Instance()->OnKeyCallback(key, scancode, action, mods);
     }
 
     static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     {
- 	    ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
-
- 	    ImGuiIO& io = ImGui::GetIO();
- 	    if (!io.WantCaptureMouse) {
- 		    Input::Instance()->OnScrollCallback(xoffset, yoffset);
- 	    }
+        Input::Instance()->OnScrollCallback(xoffset, yoffset);
     }
 
     static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     {
- 	    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
- 	    Input::Instance()->OnCursorPosCallback(xpos, ypos);
+        Input::Instance()->OnCursorPosCallback(xpos, ypos);
     }
 
     static void WindowFocusCallback(GLFWwindow* window, int focused)
     {
- 	    Input::Instance()->OnWindowFocusCallback(focused);
+        Input::Instance()->OnWindowFocusCallback(focused);
     }
 
     Input::Input()
@@ -67,56 +64,54 @@ namespace Isle
     {
     }
 
-    void Input::Start()
+    void Input::Start(Window* window)
     {
-        m_Window = Render::Instance()->GetWindow()->m_Handle;
- 	    if (!m_Window)
- 	    {
- 		    ISLE_ERROR("Input: Failed to get window handle!\n");
- 		    return;
- 	    }
+        if (m_Window == nullptr && window != nullptr)
+        {
+            m_Window = window->m_Handle;
+            if (!m_Window)
+            {
+                ISLE_ERROR("Input: Failed to get window handle!\n");
+                return;
+            }
+        }
 
  	    if (IsWindowFocused())
  		    SetCursorMode(true);
 
- 	    LoadBinds("Settings\\Binds.json");
+        if (!LoadBinds("Settings\\Binds.json"))
+        {
+            ISLE_ERROR("Failed to load binds!\n");
+        }
+
  	    glfwSetKeyCallback(m_Window, KeyCallback);
  	    glfwSetMouseButtonCallback(m_Window, MouseButtonCallback);
  	    glfwSetScrollCallback(m_Window, ScrollCallback);
- 	    glfwSetCharCallback(m_Window, CharCallback);
  	    glfwSetWindowFocusCallback(m_Window, WindowFocusCallback);
+        glfwSetCursorPosCallback(m_Window, CursorPosCallback);
     }
 
     void Input::Update()
     {
- 	    ImGuiIO& io = ImGui::GetIO();
-
- 	    double xpos, ypos;
- 	    glfwGetCursorPos(m_Window, &xpos, &ypos);
- 	    glm::vec2 newPosition = glm::vec2(static_cast<float>(xpos), static_cast<float>(ypos));
- 	    io.AddMousePosEvent((float)xpos, (float)ypos);
-
- 	    if (m_FirstMouse)
- 	    {
- 		    m_LastMousePosition = newPosition;
- 		    m_MouseDelta = glm::vec2(0.0f);
- 		    m_FirstMouse = false;
- 	    }
- 	    else
- 	    {
- 		    m_MouseDelta = newPosition - m_LastMousePosition;
- 		    m_LastMousePosition = newPosition;
- 	    }
-
- 	    m_MousePosition = newPosition;
-
  	    UpdateKeyStates();
  	    UpdateMouseStates();
+    }
+
+    void Input::SetWindow(Window* window)
+    {
+        if (!window)
+        {
+            ISLE_ERROR("Failed to set window for input!\n");
+            return;
+        }
+
+        m_Window = window->m_Handle;
     }
 
     void Input::Reset()
     {
  	    m_ScrollDelta = glm::vec2(0.0f);
+        m_MouseDelta = glm::vec2(0.0f);
     }
 
     void Input::Destroy()
@@ -227,7 +222,6 @@ namespace Isle
  	    if (chord.IsEmpty())
  		    return false;
 
- 	    // Check if at least one key/button is pressed
  	    bool hasPressed = false;
 
  	    for (int key : chord.keys)
@@ -236,7 +230,7 @@ namespace Isle
  		    if (state == KeyState::Pressed)
  			    hasPressed = true;
  		    else if (state != KeyState::Held && state != KeyState::Pressed)
- 			    return false; // Required key not held
+ 			    return false;
  	    }
 
  	    for (MouseButton button : chord.mouseButtons)
@@ -245,7 +239,7 @@ namespace Isle
  		    if (state == KeyState::Pressed)
  			    hasPressed = true;
  		    else if (state != KeyState::Held && state != KeyState::Pressed)
- 			    return false; // Required button not held
+ 			    return false;
  	    }
 
  	    return hasPressed;
@@ -256,7 +250,6 @@ namespace Isle
  	    if (chord.IsEmpty())
  		    return false;
 
- 	    // All keys/buttons must be held or pressed
  	    for (int key : chord.keys)
  	    {
  		    KeyState state = GetKeyState(key);
@@ -279,7 +272,6 @@ namespace Isle
  	    if (chord.IsEmpty())
  		    return false;
 
- 	    // Check if at least one key/button is released while others were held
  	    bool hasReleased = false;
 
  	    for (int key : chord.keys)
@@ -364,8 +356,6 @@ namespace Isle
  		    glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
  		    double xpos, ypos;
  		    glfwGetCursorPos(m_Window, &xpos, &ypos);
- 		    ImGuiIO& io = ImGui::GetIO();
- 		    io.AddMousePosEvent((float)xpos, (float)ypos);
  	    }
     }
 
@@ -395,19 +385,23 @@ namespace Isle
 
     void Input::OnCursorPosCallback(double xpos, double ypos)
     {
- 	    glm::vec2 newPosition = glm::vec2(static_cast<float>(xpos), static_cast<float>(ypos));
+        glm::vec2 newPosition(static_cast<float>(xpos), static_cast<float>(ypos));
 
- 	    if (m_FirstMouse)
- 	    {
- 		    m_MousePosition = newPosition;
- 		    m_LastMousePosition = newPosition;
- 		    m_MouseDelta = glm::vec2(0.0f);
- 		    m_FirstMouse = false;
- 		    return;
- 	    }
+        if (m_FirstMouse)
+        {
+            m_LastMousePosition = newPosition;
+            m_MouseDelta = glm::vec2(0.0f);
+            m_FirstMouse = false;
+        }
+        else
+        {
+            m_MouseDelta = newPosition - m_LastMousePosition;
+            m_LastMousePosition = newPosition;
+        }
 
- 	    m_MousePosition = newPosition;
+        m_MousePosition = newPosition;
     }
+
 
     void Input::OnScrollCallback(double xoffset, double yoffset)
     {

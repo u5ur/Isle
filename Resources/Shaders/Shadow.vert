@@ -13,9 +13,7 @@ void main()
 {
     uint meshIndex = gl_BaseInstance;
     GpuStaticMesh mesh = meshes[meshIndex];
-
-    uint vertexIndex = mesh.m_VertexOffset + gl_VertexID;
-    GpuVertex vertex = vertices[vertexIndex];
+    GpuVertex vertex = vertices[gl_VertexID];
 
     if (lights.length() == 0)
     {
