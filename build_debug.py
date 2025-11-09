@@ -1,3 +1,0 @@
-SELECT TOP 10 *
-FROM book
-ORDER BY title DESC;
