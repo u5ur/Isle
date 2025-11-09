@@ -17,6 +17,7 @@ IsleEngine is a full-scale C++ game engine built entirely on modern OpenGL.
 - Memory management (wip)
 - GLTF/GLB file support
 - Global Illumination and Reflections using VoxelCone tracing
+- Asset Manager
 
 **ENGINE TODO**
 - Serialization
@@ -35,9 +36,7 @@ IsleEngine is a full-scale C++ game engine built entirely on modern OpenGL.
 
 **EDITOR TODO**
 - Serialization
-- Asset Browser
-- Fix crashing when hot loading
+- Complete asset browser
 - Support all SceneComponents in Properties
-- Command system (ex. copy and paste)
 - Rendering presets (ex. no direct lighting)
 - Debugging (stats, framebuffer views, etc)
