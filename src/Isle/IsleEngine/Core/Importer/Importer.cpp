@@ -25,9 +25,10 @@ namespace Isle
             SceneComponent* root = importer->m_RootComponent;
 
             importer->m_SceneComponents.clear();
+            importer->m_StaticMeshes.clear();
+            importer->m_Materials.clear();
+            importer->m_Textures.clear();
             importer->m_RootComponent = nullptr;
-            delete importer;
-
             return root;
         }
 

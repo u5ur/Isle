@@ -14,15 +14,13 @@ namespace Isle
 		FBX, // TODO
 	};
 
-	class ISLEENGINE_API Importer : public Singleton<Importer>, public Object
+	class ISLEENGINE_API Importer : public Object
 	{
 	private:
 		GltfImporter* m_GltfImporter = nullptr;
 
 	public:
 		SceneComponent* LoadModel(std::string file_path);
-
-	private:
 		FILE_TYPE GetFileType(std::string file_path);
 
 	};

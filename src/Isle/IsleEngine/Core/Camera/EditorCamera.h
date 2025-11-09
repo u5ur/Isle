@@ -14,5 +14,6 @@ namespace Isle
     public:
         virtual void Start() override;
         virtual void Update(float delta_time) override;
+        virtual void Destroy() override;
     };
 }

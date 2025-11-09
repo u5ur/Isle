@@ -1,5 +1,4 @@
-﻿// IsleGame.cpp
-#include "IsleGame.h"
+﻿#include "IsleGame.h"
 #include <chrono>
 
 namespace Isle
@@ -8,19 +7,25 @@ namespace Isle
 
     void Application::Start()
     {
-        Scene::Instance()->Add(MainCamera::Instance());
-        Scene::Instance()->Add(CameraMan::Instance());
-        Scene::Instance()->Add(OrthographicCamera::Instance());
+        Scene::Instance()->ClearAll();
+        CameraMan::Instance()->Start();
+        EditorCamera::Instance()->Start();
+        OrthographicCamera::Instance()->Start();
+        MainCamera::Instance()->Start();
+        World::Instance()->Start();
 
-        Scene::Instance()->Add(EditorCamera::Instance());
+        Scene::Instance()->Add(MainCamera::Instance(), false);
+        Scene::Instance()->Add(CameraMan::Instance(), false);
+        Scene::Instance()->Add(OrthographicCamera::Instance(), false);
+        Scene::Instance()->Add(EditorCamera::Instance(), false);
+        Scene::Instance()->Add(World::Instance(), false);
 
-        Scene::Instance()->Add(World::Instance());
-
-        Scene::Instance()->Add(
-            Importer::Instance()->LoadModel(
-                "C:\\Users\\asdf\\Documents\\IsleEngineOpenGl\\source\\assets\\models\\Sponza\\scene.gltf"));
+        auto Asset = AssetManager::Instance()->Load(
+            "C:\\Users\\asdf\\Documents\\IsleEngineOpenGl\\source\\assets\\models\\Sponza\\scene.gltf");
+        Scene::Instance()->Add(dynamic_cast<SceneComponent*>(Asset->m_RootObject), true);
 
         s_LastFrameTime = std::chrono::high_resolution_clock::now();
+
         Scene::Instance()->Start();
     }
 
@@ -54,7 +59,7 @@ namespace Isle
 
     void Application::Destroy()
     {
-        Scene::Instance()->Destroy();
+        Scene::Instance()->ClearAll();
     }
 }
 

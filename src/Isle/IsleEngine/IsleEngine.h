@@ -11,6 +11,6 @@
 #include <Core/Scene/Scene.h>
 #include <Core/World/World.h>
 #include <Core/Graphics/Texture/Texture.h>
-#include <Core/Importer/Importer.h>
+#include <Core/AssetManager/AssetManager.h>
 #include <Core/Camera/EditorCamera.h>
 #include <Core/Camera/OrthographicCamera.h>

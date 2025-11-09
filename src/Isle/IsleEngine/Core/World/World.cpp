@@ -4,8 +4,13 @@ namespace Isle
 {
 	void World::Start()
 	{
-		AddChild(new DirectionalLight());
+		if (GetChildren<DirectionalLight>().empty())
+		{
+			auto* dirLight = new DirectionalLight();
+			AddChild(dirLight);
+		}
 	}
+
 
 	void World::Update(float delta_time)
 	{
@@ -14,7 +19,17 @@ namespace Isle
 
 	void World::Destroy()
 	{
+		auto lights = GetChildren<Light>();
+		for (auto* light : lights)
+		{
+			if (light)
+			{
+				light->Destroy();
+				delete light;
+			}
+		}
 
+		SceneComponent::Destroy();
 	}
 
 	std::vector<Light*> World::GetLights()

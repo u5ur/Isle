@@ -214,7 +214,7 @@ void main()
     
     for (int i = 0; i < lights.length(); i++)
     {
-        GpuLight light = lights[0];
+        GpuLight light = lights[i];
         
         if (light.m_Type == LIGHT_TYPE_DIRECTIONAL)
         {

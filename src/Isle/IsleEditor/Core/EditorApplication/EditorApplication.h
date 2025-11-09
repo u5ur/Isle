@@ -1,3 +1,4 @@
+// EditorApplication.h
 #pragma once
 #include <IsleEngine.h>
 #include <Core/Common/EditorCommon.h>

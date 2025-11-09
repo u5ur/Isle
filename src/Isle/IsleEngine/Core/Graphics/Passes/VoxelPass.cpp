@@ -147,6 +147,9 @@ namespace Isle
             m_AtomicCounter->BindAsImage(4, GL_READ_WRITE, 0);
 
             m_BuildShader->SetIVec3("u_Resolution", m_Resolution);
+            m_BuildShader->SetIVec3("u_GridMin", m_GridMin);
+            m_BuildShader->SetIVec3("u_GridMax", m_GridMax);
+            m_BuildShader->SetVec3("u_CellSize", m_CellSize);
 
             glm::ivec3 groupCount = (m_Resolution + glm::ivec3(7)) / glm::ivec3(8);
             glDispatchCompute(groupCount.x, groupCount.y, groupCount.z);

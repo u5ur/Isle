@@ -1,4 +1,5 @@
-﻿#include <Core/EditorApplication/EditorApplication.h>
+﻿// IsleEditor.cpp
+#include <Core/EditorApplication/EditorApplication.h>
 
 int main()
 {

@@ -6,6 +6,16 @@
 #include <iostream>
 #include <string>
 #include <cstdint>
+#ifdef _WIN32
+#ifdef ISLEENGINE_EXPORTS
+#define ISLEENGINE_API __declspec(dllexport)
+#else
+#define ISLEENGINE_API __declspec(dllimport)
+#endif
+#else
+#define ISLEENGINE_API
+#endif
+
 #include <algorithm>
 #include <vector>
 #include <map>
@@ -131,15 +141,3 @@ inline bool HasAnsiSupport()
     } while (0)
 
 #include "Reflection/Reflection.h"
-
-#pragma once
-
-#ifdef _WIN32
-#ifdef ISLEENGINE_EXPORTS
-#define ISLEENGINE_API __declspec(dllexport)
-#else
-#define ISLEENGINE_API __declspec(dllimport)
-#endif
-#else
-#define ISLEENGINE_API
-#endif

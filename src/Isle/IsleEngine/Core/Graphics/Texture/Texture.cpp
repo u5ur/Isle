@@ -226,10 +226,17 @@ namespace Isle
         GLenum internalFormat = ResolveInternalFormat(m_Format);
         GLenum format = ResolveFormat(m_Format);
         GLenum type = ResolveDataType(m_Format);
+
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, nullptr);
+
+        SetMinFilter(m_MinFilter);
+        SetMagFilter(m_MagFilter);
+        SetWrapS(m_WrapS);
+        SetWrapT(m_WrapT);
+
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        m_SizeInBytes = width * height * 4;
+        m_SizeInBytes = CalculateTextureSize(width, height, m_Format);
     }
 
     void Texture::SetDebugLabel(const std::string& name)

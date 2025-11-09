@@ -8,6 +8,7 @@ namespace Isle
     {
         m_Camera = new Camera();
         this->SetName("CameraMan");
+        AddChild(m_Camera);
     }
 
     void CameraMan::Update(float delta_time)
@@ -48,5 +49,19 @@ namespace Isle
             velocity = glm::normalize(velocity);
 
         m_Camera->Move(velocity * speed * delta_time);
+    }
+
+    void CameraMan::Destroy()
+    {
+        ISLE_LOG("CameraMan: Destroying...\n");
+
+        if (m_Camera)
+        {
+            m_Camera->Destroy();
+            delete m_Camera;
+            m_Camera = nullptr;
+        }
+
+        SceneComponent::Destroy();
     }
 }

@@ -32,11 +32,9 @@ namespace Isle
     void ShadowPass::Bind()
     {
         m_FrameBuffer->Bind();
-        m_FrameBuffer->ClearDepth();
-        m_FrameBuffer->Clear();
-
-        m_Shader->Bind();
         m_PipelineState->Bind();
+        m_FrameBuffer->Clear();
+        m_Shader->Bind();
     }
 
     void ShadowPass::Unbind()

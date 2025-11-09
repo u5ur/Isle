@@ -1,3 +1,4 @@
+// EditorApplication.cpp
 #include "EditorApplication.h"
 #include <Core/ModuleManager/ModuleManager.h>
 #include <Core/Editor/Editor.h>
@@ -22,6 +23,8 @@ namespace Isle
 
         Editor::Instance()->Start();
 
+        ISLE_SUCCESS("Editor Loaded!\n");
+
         if (!LoadGameDLL())
         {
             ISLE_ERROR("Failed to load game DLL on startup\n");
@@ -31,6 +34,10 @@ namespace Isle
         if (!InitializeGame())
         {
             ISLE_ERROR("Failed to initialize game on startup\n");
+        }
+        else
+        {
+            ISLE_SUCCESS("Game Loaded!\n");
         }
     }
 
@@ -58,7 +65,7 @@ namespace Isle
         }
         prevEsc = esc;
 
-        m_Window->Clear(glm::vec4(0.2f, 0.2f, 0.2f, 1.0f));
+        m_Window->Clear(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         if (m_Game && m_SetPaused && m_UpdateFunc)
         {
             m_SetPaused(m_Game, m_Paused);
@@ -96,20 +103,16 @@ namespace Isle
     bool EditorApplication::LoadGameDLL()
     {
 #ifdef _DEBUG
-        const char* dllPath = "build/IsleGame_Debug.dll";
+        const char* dllPath = "build/Debug/IsleGame_Debug.dll";
 #else
-        const char* dllPath = "build/IsleGame.dll";
+        const char* dllPath = "build/Build/IsleGame.dll";
 #endif
-
-        ISLE_LOG("Loading game DLL: %s\n", dllPath);
 
         if (!ModuleManager::Instance()->Load(dllPath))
         {
             ISLE_ERROR("Failed to load: %s\n", dllPath);
             return false;
         }
-
-        ISLE_LOG("Loaded %s\n", dllPath);
 
         m_CreateApp = ModuleManager::Instance()->Get<CreateAppFunc>("CreateApplication");
         m_DestroyApp = ModuleManager::Instance()->Get<DestroyAppFunc>("DestroyApplication");
@@ -143,6 +146,7 @@ namespace Isle
 
     bool EditorApplication::InitializeGame()
     {
+
         if (!m_CreateApp)
         {
             ISLE_ERROR("CreateApp function not loaded\n");
@@ -163,6 +167,8 @@ namespace Isle
         Render::Instance()->SetEditorMode(true);
 
         m_StartFunc(m_Game);
+
+        MainCamera::Instance()->SetCamera(EditorCamera::Instance()->m_Camera);
 
         if (Scene::Instance())
         {

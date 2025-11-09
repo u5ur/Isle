@@ -3,67 +3,10 @@
 #include <IsleEngine.h>
 #include <Core/ModuleManager/ModuleManager.h>
 #include <Core/EditorApplication/EditorApplication.h>
-#include <windows.h>
-#include <string>
+#include <Core/Builder/Builder.h>
 
 namespace Isle
 {
-    class DLLReloader
-    {
-    public:
-        static bool ReloadGameDLL()
-        {
-            auto editorApp = EditorApplication::Instance();
-
-#ifdef _DEBUG
-            const char* dllName = "IsleGame_Debug.dll";
-#else
-            const char* dllName = "IsleGame.dll";
-#endif
-            std::string buildDll = std::string("build/") + dllName;
-
-            ISLE_LOG("[1/6] Shutting down game...\n");
-            editorApp->ShutdownGame();
-
-            ISLE_LOG("[2/6] Unloading DLL...\n");
-            editorApp->UnloadGameDLL();
-            Sleep(1500);
-
-            ISLE_LOG("[3/6] Deleting old DLL...\n");
-            DeleteFileA(buildDll.c_str());
-
-            ISLE_LOG("[4/6] Building project...\n");
-            if (system("cmake --build --preset build-debug") != 0)
-            {
-                ISLE_ERROR("Build failed!\n");
-                ISLE_LOG("Attempting to recover...\n");
-                if (editorApp->LoadGameDLL())
-                {
-                    editorApp->InitializeGame();
-                }
-                return false;
-            }
-
-            ISLE_LOG("Build successful!\n");
-
-            ISLE_LOG("[5/6] Loading new DLL...\n");
-            if (!editorApp->LoadGameDLL())
-            {
-                ISLE_ERROR("Failed to load new DLL!\n");
-                return false;
-            }
-
-            ISLE_LOG("[6/6] Initializing game...\n");
-            if (!editorApp->InitializeGame())
-            {
-                ISLE_ERROR("Failed to initialize game!\n");
-                return false;
-            }
-
-            return true;
-        }
-    };
-
     class Editor::Navbar : public EditorComponent
     {
     public:
@@ -90,6 +33,37 @@ namespace Isle
             return;
         }
 
+        // File Menu
+        if (ImGui::Button("File"))
+            ImGui::OpenPopup("FileMenu");
+
+        if (ImGui::BeginPopup("FileMenu"))
+        {
+            if (ImGui::MenuItem("Load Asset/Model"))
+            {
+                OPENFILENAMEA ofn;
+                char szFile[260] = { 0 };
+
+                ZeroMemory(&ofn, sizeof(ofn));
+                ofn.lStructSize = sizeof(ofn);
+                ofn.hwndOwner = nullptr;
+                ofn.lpstrFile = szFile;
+                ofn.nMaxFile = sizeof(szFile);
+                ofn.lpstrFilter = "All Supported\0*.gltf;*.glb;*.fbx;*.obj\0GLTF\0*.gltf;*.glb\0FBX\0*.fbx\0OBJ\0*.obj\0All Files\0*.*\0";
+                ofn.nFilterIndex = 1;
+                ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+                if (GetOpenFileNameA(&ofn) == TRUE)
+                {
+                    AssetManager::Instance()->Load(ofn.lpstrFile);
+                }
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+
         if (ImGui::Button("Game"))
             ImGui::OpenPopup("GameMenu");
 
@@ -97,9 +71,9 @@ namespace Isle
         {
             auto editorApp = Isle::EditorApplication::Instance();
 
-            if (ImGui::MenuItem("Reload DLL", "Ctrl+R"))
+            if (ImGui::MenuItem("Build", "Ctrl + B"))
             {
-                DLLReloader::ReloadGameDLL();
+                Builder::Instance()->ReloadGame();
             }
 
             ImGui::Separator();

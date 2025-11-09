@@ -14,9 +14,10 @@ namespace Isle
         class Viewport;
         class AssetBrowser;
         class TransformWidget;
+        class CommandHistory;
 
     private:
-        SceneComponent* m_SelectedComponent = nullptr;
+        std::vector<SceneComponent*> m_SelectedComponents;
 
     public:
         Properties* m_Properties;
@@ -25,6 +26,7 @@ namespace Isle
         Viewport* m_Viewport;
         AssetBrowser* m_AssetBrowser;
         TransformWidget* m_TransformWidget;
+        CommandHistory* m_Commands;
 
         std::vector<EditorComponent*> m_Components;
         ImVec2 m_ViewportPos;
@@ -34,6 +36,11 @@ namespace Isle
         DOCK_SIDE m_ResizingSide = DOCK_SIDE::NONE;
         ImVec2 m_ResizeStartPos;
         float m_ResizeStartSize;
+
+        bool m_IsSelecting = false;
+        ImVec2 m_SelectionStart;
+        ImVec2 m_SelectionEnd;
+        bool m_MultiSelectMode = false;
 
     public:
         void Start();
@@ -49,11 +56,16 @@ namespace Isle
         SceneComponent* GetSelectedComponent();
         void SetSelectedComponent(SceneComponent* scene_comp);
 
+        std::vector<SceneComponent*>& GetSelectedComponents() { return m_SelectedComponents; }
+        void AddSelectedComponent(SceneComponent* scene_comp);
+        void RemoveSelectedComponent(SceneComponent* scene_comp);
+        bool IsComponentSelected(SceneComponent* comp);
+        void ClearSelection();
+
     private:
         void CalculateLayout();
         void RenderComponent(EditorComponent* component);
         void HandleResizing();
         void SelectMesh(Mesh* selectedMesh, bool state);
-
     };
 }

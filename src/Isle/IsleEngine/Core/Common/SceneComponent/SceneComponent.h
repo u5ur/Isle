@@ -1,311 +1,399 @@
-// SceneComponent.h
-
 namespace Isle
 {
-	class SceneComponent : public Component
-	{
-	public:
-		SceneComponent* m_Owner = nullptr;
-		std::vector<SceneComponent*> m_Children;
-		Transform m_Transform = Transform();
-		Bounds m_Bounds = Bounds();
+    class ISLEENGINE_API SceneComponent : public Component
+    {
+    public:
+        SceneComponent* m_Owner = nullptr;
+        std::vector<SceneComponent*> m_Children;
+        Transform m_Transform = Transform();
+        Bounds m_Bounds = Bounds();
 
-	public:
-		virtual void Update(float delta_time = 0.0f) {};
+    private:
+        bool m_IsDestroyed = false;
 
-		void AddChild(SceneComponent* child)
-		{
-			if (!child || child == this)
-				return;
+    public:
+        virtual void Update(float delta_time = 0.0f) {};
 
-			if (child->m_Owner)
-				child->m_Owner->RemoveChild(child);
+        bool IsValid() const { return !m_IsDestroyed; }
 
-			child->m_Owner = this;
-			m_Children.push_back(child);
-		}
+        void AddChild(SceneComponent* child)
+        {
+            if (!child || child == this || m_IsDestroyed)
+            {
+                return;
+            }
 
-		void RemoveChild(SceneComponent* child)
-		{
-			if (!child)
-				return;
+            if (std::find(m_Children.begin(), m_Children.end(), child) != m_Children.end())
+            {
+                return;
+            }
 
-			auto it = std::find(m_Children.begin(), m_Children.end(), child);
-			if (it != m_Children.end())
-			{
-				child->m_Owner = nullptr;
-				m_Children.erase(it);
-			}
-		}
+            if (child->m_Owner && child->m_Owner != this)
+            {
+                child->m_Owner->RemoveChild(child);
+            }
 
-		void SetChild(size_t index, SceneComponent* child, bool transferOwnership = true)
-		{
-			if (index >= m_Children.size())
-				return;
+            child->m_Owner = this;
+            m_Children.push_back(child);
+        }
 
-			if (!child)
-			{
-				SceneComponent* oldChild = m_Children[index];
-				if (oldChild && transferOwnership)
-					oldChild->m_Owner = nullptr;
-				m_Children[index] = nullptr;
-				return;
-			}
+        void RemoveChild(SceneComponent* child)
+        {
+            if (!child || m_IsDestroyed)
+                return;
 
-			if (child == this)
-				return;
+            auto it = std::find(m_Children.begin(), m_Children.end(), child);
+            if (it != m_Children.end())
+            {
+                child->m_Owner = nullptr;
+                m_Children.erase(it);
+            }
+        }
 
-			if (transferOwnership && child->m_Owner)
-				child->m_Owner->RemoveChild(child);
+        void SetChild(size_t index, SceneComponent* child, bool transferOwnership = true)
+        {
+            if (m_IsDestroyed)
+                return;
 
-			SceneComponent* oldChild = m_Children[index];
-			if (oldChild && transferOwnership)
-				oldChild->m_Owner = nullptr;
+            if (index >= m_Children.size())
+            {
+                return;
+            }
 
-			if (transferOwnership)
-				child->m_Owner = this;
+            if (!child)
+            {
+                SceneComponent* oldChild = m_Children[index];
+                if (oldChild && transferOwnership)
+                    oldChild->m_Owner = nullptr;
+                m_Children[index] = nullptr;
+                return;
+            }
 
-			m_Children[index] = child;
-		}
+            if (child == this)
+            {
+                return;
+            }
 
-		void RemoveAllChildren()
-		{
-			for (auto* child : m_Children)
-			{
-				if (child)
-					child->m_Owner = nullptr;
-			}
-			m_Children.clear();
-		}
+            if (transferOwnership && child->m_Owner && child->m_Owner != this)
+                child->m_Owner->RemoveChild(child);
 
-		template<typename T>
-		T* GetChild()
-		{
-			for (Component* child : m_Children)
-			{
-				if (T* casted = dynamic_cast<T*>(child))
-					return casted;
-			}
-			return nullptr;
-		}
+            SceneComponent* oldChild = m_Children[index];
+            if (oldChild && transferOwnership)
+                oldChild->m_Owner = nullptr;
 
-		template<typename T>
-		std::vector<T*> GetChildren()
-		{
-			std::vector<T*> results;
-			for (SceneComponent* child : m_Children)
-			{
-				if (T* casted = dynamic_cast<T*>(child))
-					results.push_back(casted);
-			}
-			return results;
-		}
+            if (transferOwnership)
+                child->m_Owner = this;
 
-		std::vector<SceneComponent*> GetChildren()
-		{
-			std::vector<SceneComponent*> results;
-			for (SceneComponent* child : m_Children)
-			{
-				results.push_back(child);
-			}
-			return results;
-		}
+            m_Children[index] = child;
+        }
 
-		template<typename T>
-		std::vector<T*> GetChildrenInChildren()
-		{
-			std::vector<T*> results;
+        virtual void Destroy() override
+        {
+            if (m_IsDestroyed)
+                return;
 
-			std::function<void(Component*)> traverse = [&](SceneComponent* current)
-			{
-				for (SceneComponent* child : current->m_Children)
-				{
-					if (T* casted = dynamic_cast<T*>(child))
-						results.push_back(casted);
+            m_IsDestroyed = true;
 
-					traverse(child);
-				}
-			};
 
-			traverse(this);
-			return results;
-		}
+            for (auto* child : m_Children)
+            {
+                if (child && child->IsValid())
+                {
+                    child->m_Owner = nullptr;
+                }
+            }
 
-		std::vector<SceneComponent*> GetChildrenInChildren()
-		{
-			std::vector<SceneComponent*> results;
+            m_Children.clear();
+            m_Owner = nullptr;
+        }
 
-			std::function<void(SceneComponent*)> traverse = [&](SceneComponent* current)
-				{
-					for (SceneComponent* child : current->m_Children)
-					{
-						if (SceneComponent* casted = dynamic_cast<SceneComponent*>(child))
-							results.push_back(casted);
+        void RemoveAllChildren()
+        {
+            if (m_IsDestroyed)
+                return;
 
-						traverse(child);
-					}
-				};
+            for (auto* child : m_Children)
+            {
+                if (child)
+                    child->m_Owner = nullptr;
+            }
+            m_Children.clear();
+        }
 
-			traverse(this);
-			return results;
-		}
+        template<typename T>
+        T* GetChild()
+        {
+            if (m_IsDestroyed)
+                return nullptr;
 
-		void SetBounds(Bounds bounds)
-		{
-			m_Bounds = bounds;
-		}
+            for (SceneComponent* child : m_Children)
+            {
+                if (!child || !child->IsValid())
+                    continue;
 
-		Bounds GetBounds()
-		{
-			return m_Bounds;
-		}
+                if (T* casted = dynamic_cast<T*>(child))
+                    return casted;
+            }
+            return nullptr;
+        }
 
-		size_t GetChildCount() const
-		{
-			return m_Children.size();
-		}
+        template<typename T>
+        std::vector<T*> GetChildren()
+        {
+            std::vector<T*> results;
 
-		SceneComponent* GetParent() const
-		{
-			return m_Owner;
-		}
+            if (m_IsDestroyed)
+                return results;
 
-		bool HasChildren() const
-		{
-			return !m_Children.empty();
-		}
+            for (SceneComponent* child : m_Children)
+            {
+                if (!child || !child->IsValid())
+                    continue;
 
-		bool HasParent() const
-		{
-			return m_Owner != nullptr;
-		}
+                if (T* casted = dynamic_cast<T*>(child))
+                    results.push_back(casted);
+            }
+            return results;
+        }
 
-		void SetLocalMatrix(const glm::mat4& matrix)
-		{
-			m_Transform = Transform::FromMatrix(matrix);
-		}
+        std::vector<SceneComponent*> GetChildren()
+        {
+            std::vector<SceneComponent*> results;
 
-		glm::mat4 GetLocalMatrix() const
-		{
-			return m_Transform.ToMatrix();
-		}
+            if (m_IsDestroyed)
+                return results;
 
-		void SetLocalPosition(const glm::vec3& pos)
-		{
-			m_Transform.m_Translation = pos;
-		}
+            for (SceneComponent* child : m_Children)
+            {
+                if (child && child->IsValid())
+                    results.push_back(child);
+            }
+            return results;
+        }
 
-		void SetLocalRotation(const glm::quat& rot)
-		{
-			m_Transform.m_Rotation = rot;
-		}
+        template<typename T>
+        std::vector<T*> GetChildrenInChildren()
+        {
+            std::vector<T*> results;
 
-		void SetLocalScale(const glm::vec3& scl)
-		{
-			m_Transform.m_Scale = scl;
-		}
+            if (m_IsDestroyed)
+                return results;
 
-		glm::vec3 GetLocalPosition() const
-		{
-			return m_Transform.m_Translation;
-		}
+            std::function<void(SceneComponent*)> traverse = [&](SceneComponent* current)
+                {
+                    if (!current || !current->IsValid())
+                        return;
 
-		glm::quat GetLocalRotation() const
-		{
-			return m_Transform.m_Rotation;
-		}
+                    for (SceneComponent* child : current->m_Children)
+                    {
+                        if (!child || !child->IsValid())
+                            continue;
 
-		glm::vec3 GetLocalScale() const
-		{
-			return m_Transform.m_Scale;
-		}
+                        if (T* casted = dynamic_cast<T*>(child))
+                            results.push_back(casted);
 
-		glm::mat4 GetWorldMatrix() const
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-				return Parent->GetWorldMatrix() * GetLocalMatrix();
-			return GetLocalMatrix();
-		}
+                        traverse(child);
+                    }
+                };
 
-		void SetWorldMatrix(const glm::mat4& matrix)
-		{
-			const auto Parent = m_Owner;
-			glm::mat4 localMatrix = matrix;
-			if (Parent)
-			{
-				glm::mat4 parentWorld = Parent->GetWorldMatrix();
-				glm::mat4 parentInv = glm::inverse(parentWorld);
-				localMatrix = parentInv * matrix;
-			}
-			m_Transform = Transform::FromMatrix(localMatrix);
-		}
+            traverse(this);
+            return results;
+        }
 
-		glm::vec3 GetWorldPosition() const
-		{
-			glm::mat4 world = GetWorldMatrix();
-			return glm::vec3(world[3]);
-		}
+        std::vector<SceneComponent*> GetChildrenInChildren()
+        {
+            std::vector<SceneComponent*> results;
 
-		void SetWorldPosition(const glm::vec3& pos)
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-			{
-				glm::mat4 parentWorld = Parent->GetWorldMatrix();
-				glm::mat4 parentInv = glm::inverse(parentWorld);
-				glm::vec4 localPos = parentInv * glm::vec4(pos, 1.0f);
-				m_Transform.m_Translation = glm::vec3(localPos);
-			}
-			else
-			{
-				m_Transform.m_Translation = pos;
-			}
-		}
+            if (m_IsDestroyed)
+                return results;
 
-		glm::quat GetWorldRotation() const
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-				return Parent->GetWorldRotation() * m_Transform.m_Rotation;
-			return m_Transform.m_Rotation;
-		}
+            std::function<void(SceneComponent*)> traverse = [&](SceneComponent* current)
+                {
+                    if (!current || !current->IsValid())
+                        return;
 
-		void SetWorldRotation(const glm::quat& rot)
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-			{
-				glm::quat parentRot = Parent->GetWorldRotation();
-				glm::quat invParent = glm::inverse(parentRot);
-				m_Transform.m_Rotation = invParent * rot;
-			}
-			else
-			{
-				m_Transform.m_Rotation = rot;
-			}
-		}
+                    for (SceneComponent* child : current->m_Children)
+                    {
+                        if (!child || !child->IsValid())
+                            continue;
 
-		glm::vec3 GetWorldScale() const
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-				return Parent->GetWorldScale() * m_Transform.m_Scale;
-			return m_Transform.m_Scale;
-		}
+                        results.push_back(child);
+                        traverse(child);
+                    }
+                };
 
-		void SetWorldScale(const glm::vec3& scl)
-		{
-			const auto Parent = m_Owner;
-			if (Parent)
-			{
-				glm::vec3 parentScale = Parent->GetWorldScale();
-				m_Transform.m_Scale = scl / parentScale;
-			}
-			else
-			{
-				m_Transform.m_Scale = scl;
-			}
-		}
-	};
+            traverse(this);
+            return results;
+        }
+
+        void SetBounds(Bounds bounds)
+        {
+            if (!m_IsDestroyed)
+                m_Bounds = bounds;
+        }
+
+        Bounds GetBounds() const
+        {
+            return m_Bounds;
+        }
+
+        size_t GetChildCount() const
+        {
+            return m_Children.size();
+        }
+
+        SceneComponent* GetParent() const
+        {
+            return m_Owner;
+        }
+
+        bool HasChildren() const
+        {
+            return !m_Children.empty();
+        }
+
+        bool HasParent() const
+        {
+            return m_Owner != nullptr;
+        }
+
+        void SetLocalMatrix(const glm::mat4& matrix)
+        {
+            if (!m_IsDestroyed)
+                m_Transform = Transform::FromMatrix(matrix);
+        }
+
+        glm::mat4 GetLocalMatrix() const
+        {
+            return m_Transform.ToMatrix();
+        }
+
+        void SetLocalPosition(const glm::vec3& pos)
+        {
+            if (!m_IsDestroyed)
+                m_Transform.m_Translation = pos;
+        }
+
+        void SetLocalRotation(const glm::quat& rot)
+        {
+            if (!m_IsDestroyed)
+                m_Transform.m_Rotation = rot;
+        }
+
+        void SetLocalScale(const glm::vec3& scl)
+        {
+            if (!m_IsDestroyed)
+                m_Transform.m_Scale = scl;
+        }
+
+        glm::vec3 GetLocalPosition() const
+        {
+            return m_Transform.m_Translation;
+        }
+
+        glm::quat GetLocalRotation() const
+        {
+            return m_Transform.m_Rotation;
+        }
+
+        glm::vec3 GetLocalScale() const
+        {
+            return m_Transform.m_Scale;
+        }
+
+        glm::mat4 GetWorldMatrix() const
+        {
+            if (m_Owner && m_Owner->IsValid())
+                return m_Owner->GetWorldMatrix() * GetLocalMatrix();
+            return GetLocalMatrix();
+        }
+
+        void SetWorldMatrix(const glm::mat4& matrix)
+        {
+            if (m_IsDestroyed)
+                return;
+
+            glm::mat4 localMatrix = matrix;
+
+            if (m_Owner && m_Owner->IsValid())
+            {
+                glm::mat4 parentWorld = m_Owner->GetWorldMatrix();
+                glm::mat4 parentInv = glm::inverse(parentWorld);
+                localMatrix = parentInv * matrix;
+            }
+
+            m_Transform = Transform::FromMatrix(localMatrix);
+        }
+
+        glm::vec3 GetWorldPosition() const
+        {
+            glm::mat4 world = GetWorldMatrix();
+            return glm::vec3(world[3]);
+        }
+
+        void SetWorldPosition(const glm::vec3& pos)
+        {
+            if (m_IsDestroyed)
+                return;
+
+            if (m_Owner && m_Owner->IsValid())
+            {
+                glm::mat4 parentWorld = m_Owner->GetWorldMatrix();
+                glm::mat4 parentInv = glm::inverse(parentWorld);
+                glm::vec4 localPos = parentInv * glm::vec4(pos, 1.0f);
+                m_Transform.m_Translation = glm::vec3(localPos);
+            }
+            else
+            {
+                m_Transform.m_Translation = pos;
+            }
+        }
+
+        glm::quat GetWorldRotation() const
+        {
+            if (m_Owner && m_Owner->IsValid())
+                return m_Owner->GetWorldRotation() * m_Transform.m_Rotation;
+            return m_Transform.m_Rotation;
+        }
+
+        void SetWorldRotation(const glm::quat& rot)
+        {
+            if (m_IsDestroyed)
+                return;
+
+            if (m_Owner && m_Owner->IsValid())
+            {
+                glm::quat parentRot = m_Owner->GetWorldRotation();
+                glm::quat invParent = glm::inverse(parentRot);
+                m_Transform.m_Rotation = invParent * rot;
+            }
+            else
+            {
+                m_Transform.m_Rotation = rot;
+            }
+        }
+
+        glm::vec3 GetWorldScale() const
+        {
+            if (m_Owner && m_Owner->IsValid())
+                return m_Owner->GetWorldScale() * m_Transform.m_Scale;
+            return m_Transform.m_Scale;
+        }
+
+        void SetWorldScale(const glm::vec3& scl)
+        {
+            if (m_IsDestroyed)
+                return;
+
+            if (m_Owner && m_Owner->IsValid())
+            {
+                glm::vec3 parentScale = m_Owner->GetWorldScale();
+                m_Transform.m_Scale = scl / parentScale;
+            }
+            else
+            {
+                m_Transform.m_Scale = scl;
+            }
+        }
+    };
 }

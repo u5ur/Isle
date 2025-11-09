@@ -292,7 +292,33 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
     return F0 + (maxFresnel - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+vec3 HandleOutline(vec2 uv, vec3 baseColor)
+{
+    float center = texture(u_Selection, uv).r;
+    if (center < 0.5)
+        return baseColor;
 
+    vec2 texel = 1.0 / vec2(textureSize(u_Selection, 0));
+    float edge = 0.0;
+
+    for (int x = -2; x <= 2; ++x)
+    {
+        for (int y = -2; y <= 2; ++y)
+        {
+            vec2 offset = vec2(x, y) * texel;
+            if (texture(u_Selection, uv + offset).r < 0.5)
+                edge += 1.0;
+        }
+    }
+
+    if (edge > 0.0)
+    {
+        float intensity = clamp(edge / 8.0, 0.0, 1.0);
+        return mix(baseColor, u_OutlineColor, intensity);
+    }
+
+    return baseColor;
+}
 
 void main()
 {
@@ -315,10 +341,10 @@ void main()
     
     vec3 viewDir = normalize(camera.m_Position - worldPos);
     vec3 finalColor = directLighting;
-    
+            vec3 indirectDiffuse = ComputeIndirectDiffuse(worldPos, normal, roughness);
+
     if (u_EnableGI)
     {
-        vec3 indirectDiffuse = ComputeIndirectDiffuse(worldPos, normal, roughness);
         vec3 kD = vec3(1.0 - metallic);
         finalColor += indirectDiffuse * albedo * kD;
     }
@@ -348,15 +374,7 @@ void main()
     float selected = texture(u_Selection, TexCoord).r;
     if (selected > 0.5)
     {
-        vec2 texelSize = 1.0 / vec2(textureSize(u_Selection, 0));
-        float edge = 
-            texture(u_Selection, TexCoord + vec2(texelSize.x, 0.0)).r +
-            texture(u_Selection, TexCoord - vec2(texelSize.x, 0.0)).r +
-            texture(u_Selection, TexCoord + vec2(0.0, texelSize.y)).r +
-            texture(u_Selection, TexCoord - vec2(0.0, texelSize.y)).r;
-        
-        if (edge < 3.5)
-            finalColor = mix(finalColor, u_OutlineColor, 0.85);
+        finalColor = HandleOutline(TexCoord, finalColor);
     }
     
     FragColor = vec4(finalColor, 1.0);

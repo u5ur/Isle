@@ -7,8 +7,9 @@ namespace Isle
     {
         m_Camera = new Camera();
         SetName("EditorCamera");
+        AddChild(m_Camera);
 
-        m_Camera->SetFov(45.0f);
+        m_Camera->SetFov(60.0f);
         m_Camera->SetNear(0.1f);
         m_Camera->SetFar(1000.0f);
 
@@ -55,10 +56,21 @@ namespace Isle
             float rotateSpeed = 0.2f;
             m_Camera->Rotate(-mouseDelta.y * rotateSpeed, mouseDelta.x * rotateSpeed);
 
-            // Reposition camera to orbit around target
             glm::vec3 newPosition = m_Target - m_Camera->m_Front * m_Distance;
             m_Camera->SetPosition(newPosition);
             m_Camera->SetLook(m_Target);
         }
+    }
+
+    void EditorCamera::Destroy()
+    {
+        if (m_Camera)
+        {
+            m_Camera->Destroy();
+            delete m_Camera;
+            m_Camera = nullptr;
+        }
+
+        SceneComponent::Destroy();
     }
 }

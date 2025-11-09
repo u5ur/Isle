@@ -3,6 +3,7 @@
 #include <Core/ModuleManager/ModuleManager.h>
 #include <Core/EditorApplication/EditorApplication.h>
 #include <Core/Editor/Properties/Properties.h>
+#include <Core/Editor/CommandHistory/CommandHistory.h>
 #include <Core/Editor/Viewport/Viewport.h>
 #include <Core/Editor/TransformWidget/TransformWidget.h>
 #include <Core/Editor/Navbar/Navbar.h>
@@ -13,6 +14,9 @@ namespace Isle
 {
     void Editor::Start()
     {
+        m_Commands = new CommandHistory();
+        m_Commands->Start();
+
         m_Navbar = new Navbar();
         DockConstraints navbarDock;
         navbarDock.m_Side = DOCK_SIDE::TOP;
@@ -76,6 +80,8 @@ namespace Isle
         m_TransformWidget = new TransformWidget();
         m_TransformWidget->Start();
 
+        m_AssetBrowser->Start();
+
         m_Components.push_back(m_Navbar);
         m_Components.push_back(m_Properties);
         m_Components.push_back(m_Scene);
@@ -83,8 +89,21 @@ namespace Isle
         m_Components.push_back(m_Viewport);
     }
 
+
+
     void Editor::Update()
     {
+        ImGuiIO& io = ImGui::GetIO();
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z) && !io.KeyShift)
+        {
+            m_Commands->Undo();
+        }
+        if ((io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)) ||
+            (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)))
+        {
+            m_Commands->Redo();
+        }
+
         CalculateLayout();
         HandleResizing();
 
@@ -104,6 +123,7 @@ namespace Isle
         m_Scene->Destroy();
         m_Viewport->Destroy();
         m_AssetBrowser->Destroy();
+        m_Commands->Destroy();
     }
 
     void Editor::Add(EditorComponent* component)
@@ -133,12 +153,38 @@ namespace Isle
 
     SceneComponent* Editor::GetSelectedComponent()
     {
-        return m_SelectedComponent;
+        return m_SelectedComponents.empty() ? nullptr : m_SelectedComponents[0];
     }
 
     void Editor::SetSelectedComponent(SceneComponent* scene_comp)
     {
-        m_SelectedComponent = scene_comp;
+        m_SelectedComponents.clear();
+        if (scene_comp)
+            m_SelectedComponents.push_back(scene_comp);
+    }
+
+    void Editor::AddSelectedComponent(SceneComponent* scene_comp)
+    {
+        if (!scene_comp) return;
+        if (std::find(m_SelectedComponents.begin(), m_SelectedComponents.end(), scene_comp) == m_SelectedComponents.end())
+            m_SelectedComponents.push_back(scene_comp);
+    }
+
+    void Editor::RemoveSelectedComponent(SceneComponent* scene_comp)
+    {
+        auto it = std::find(m_SelectedComponents.begin(), m_SelectedComponents.end(), scene_comp);
+        if (it != m_SelectedComponents.end())
+            m_SelectedComponents.erase(it);
+    }
+
+    void Editor::ClearSelection()
+    {
+        m_SelectedComponents.clear();
+    }
+
+    bool Editor::IsComponentSelected(SceneComponent* comp)
+    {
+        return std::find(m_SelectedComponents.begin(), m_SelectedComponents.end(), comp) != m_SelectedComponents.end();
     }
 
     void Editor::CalculateLayout()
@@ -369,5 +415,4 @@ namespace Isle
         }
         ImGui::End();
     }
-
 }

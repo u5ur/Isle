@@ -9,6 +9,7 @@ namespace Isle
     {
         m_Camera = new Camera();
         SetName("OrthographicCamera");
+        AddChild(m_Camera);
 
         m_ZoomLevel = 10.0f;
         m_Left = -10.0f;
@@ -103,5 +104,17 @@ namespace Isle
     {
         m_Target = target;
         UpdateCameraPosition();
+    }
+
+    void OrthographicCamera::Destroy()
+    {
+        if (m_Camera)
+        {
+            m_Camera->Destroy();
+            delete m_Camera;
+            m_Camera = nullptr;
+        }
+
+        SceneComponent::Destroy();
     }
 }

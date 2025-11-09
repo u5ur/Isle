@@ -194,26 +194,37 @@ namespace Isle
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
 
-        if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
-            glClearColor(color.r, color.g, color.b, color.a);
-        }
+        bool isDepthOnly = (m_DrawBuffers.empty() || m_DrawBuffers[0] == GL_NONE) &&
+            (m_Attachments.count(ATTACHMENT_TYPE::DEPTH) ||
+                m_Attachments.count(ATTACHMENT_TYPE::SHADOW_MAP));
 
-        glClearDepth(depth);
-        glClearStencil(stencil);
+        if (isDepthOnly) {
+            glDrawBuffer(GL_NONE);
+            glClearDepth(depth);
+            glClear(GL_DEPTH_BUFFER_BIT);
+        }
+        else {
+            if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
+                glClearColor(color.r, color.g, color.b, color.a);
+            }
 
-        GLbitfield clearBits = 0;
-        if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
-            clearBits |= GL_COLOR_BUFFER_BIT;
-        }
-        if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH) ||
-            m_Attachments.count(ATTACHMENT_TYPE::SHADOW_MAP)) {
-            clearBits |= GL_DEPTH_BUFFER_BIT;
-        }
-        if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH_STENCIL)) {
-            clearBits |= GL_STENCIL_BUFFER_BIT;
-        }
+            glClearDepth(depth);
+            glClearStencil(stencil);
 
-        glClear(clearBits);
+            GLbitfield clearBits = 0;
+            if (!m_DrawBuffers.empty() && m_DrawBuffers[0] != GL_NONE) {
+                clearBits |= GL_COLOR_BUFFER_BIT;
+            }
+            if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH) ||
+                m_Attachments.count(ATTACHMENT_TYPE::SHADOW_MAP)) {
+                clearBits |= GL_DEPTH_BUFFER_BIT;
+            }
+            if (m_Attachments.count(ATTACHMENT_TYPE::DEPTH_STENCIL)) {
+                clearBits |= GL_STENCIL_BUFFER_BIT;
+            }
+
+            glClear(clearBits);
+        }
     }
 
     void FrameBuffer::ClearColor(const glm::vec4& color)

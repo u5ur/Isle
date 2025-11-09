@@ -79,6 +79,26 @@ namespace Isle
                     IM_COL32(255, 255, 255, 64)
                 );
             }
+
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ROOT_OBJECT"))
+                {
+                    IM_ASSERT(payload->DataSize == sizeof(int));
+                    int assetId = *(const int*)payload->Data;
+
+                    AssetManager* assetManager = AssetManager::Instance();
+                    if (assetManager)
+                    {
+                        auto it = assetManager->m_Assets.find(assetId);
+                        if (it != assetManager->m_Assets.end() && it->second->m_RootObject)
+                        {
+                            Scene::Instance()->Add(dynamic_cast<SceneComponent*>(it->second->m_RootObject), true);
+                        }
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
         }
         else
         {
@@ -121,23 +141,29 @@ namespace Isle
         ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(40, 40, 40, 200));
         ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(35, 35, 35, 255));
 
-        MainCamera* mainCam = MainCamera::Instance();
-        const char* cameraTypeNames[] = { "Orthographic", "Default Perspective", "Editor Perspective" };
-        const char* currentTypeName = cameraTypeNames[(int)mainCam->m_Type];
+        MainCamera* MainCam = MainCamera::Instance();
 
-        ImGui::SetNextItemWidth(170.0f);
-        if (ImGui::BeginCombo("##CameraType", currentTypeName))
+
+        static int selected = 0;
+        const char* names[] = { "Editor", "Default", "Orthographic" };
+
+        ImGui::SetNextItemWidth(170);
+        if (ImGui::BeginCombo("##Cam", names[selected]))
         {
-            for (int i = 0; i < IM_ARRAYSIZE(cameraTypeNames); i++)
-            {
-                bool isSelected = (mainCam->m_Type == (CAMERA_TYPE)i);
-                if (ImGui::Selectable(cameraTypeNames[i], isSelected))
-                {
-                    mainCam->m_Type = (CAMERA_TYPE)i;
-                }
-
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
+            if (ImGui::Selectable("Editor", selected == 0)) 
+            { 
+                selected = 0; 
+                MainCamera::Instance()->SetCamera(EditorCamera::Instance()->m_Camera); 
+            }    
+            if (ImGui::Selectable("Default", selected == 1)) 
+            { 
+                selected = 1; 
+                MainCamera::Instance()->SetCamera(CameraMan::Instance()->m_Camera); 
+            }
+            if (ImGui::Selectable("Orthographic", selected == 2)) 
+            { 
+                selected = 2; 
+                MainCamera::Instance()->SetCamera(OrthographicCamera::Instance()->m_Camera); 
             }
             ImGui::EndCombo();
         }
@@ -253,128 +279,135 @@ namespace Isle
 
     void Editor::Viewport::HandleSelection()
     {
-        if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        ImGuiIO& io = ImGui::GetIO();
+        Editor* editor = Editor::Instance();
+
+        if (ImGuizmo::IsOver() || ImGuizmo::IsUsing())
             return;
 
-        if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) 
-            return;
+        MainCamera* mainCam = MainCamera::Instance();
+        if (!mainCam) return;
+
+        Camera* camera = mainCam->GetCamera();
+        if (!camera) return;
 
         ImVec2 viewportPos = m_CalculatedPosition;
         ImVec2 viewportSize = m_CalculatedSize;
-
         glm::vec2 mousePos = Input::Instance()->GetMousePosition();
 
         if (mousePos.x < viewportPos.x || mousePos.x > viewportPos.x + viewportSize.x ||
             mousePos.y < viewportPos.y || mousePos.y > viewportPos.y + viewportSize.y)
-        {
             return;
-        }
 
-        glm::vec2 localMousePos = mousePos - glm::vec2(viewportPos.x, viewportPos.y);
-
-        glm::vec2 ndc;
-        ndc.x = (2.0f * localMousePos.x) / viewportSize.x - 1.0f;
-        ndc.y = 1.0f - (2.0f * localMousePos.y) / viewportSize.y;
-
-        if (m_ViewportTexture && m_ViewportTexture->m_Id != 0)
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
-            float textureAspect = (float)m_ViewportTexture->m_Width / (float)m_ViewportTexture->m_Height;
-            float windowAspect = viewportSize.x / viewportSize.y;
+            glm::vec2 localMousePos = mousePos - glm::vec2(viewportPos.x, viewportPos.y);
 
-            ImVec2 displaySize = viewportSize;
-            if (textureAspect > windowAspect)
-                displaySize.y = viewportSize.x / textureAspect;
-            else
-                displaySize.x = viewportSize.y * textureAspect;
+            glm::vec2 ndc;
+            ndc.x = (2.0f * localMousePos.x) / viewportSize.x - 1.0f;
+            ndc.y = 1.0f - (2.0f * localMousePos.y) / viewportSize.y;
 
-            ImVec2 offset;
-            offset.x = (viewportSize.x - displaySize.x) * 0.5f;
-            offset.y = (viewportSize.y - displaySize.y) * 0.5f;
-
-            if (localMousePos.x < offset.x || localMousePos.x > offset.x + displaySize.x ||
-                localMousePos.y < offset.y || localMousePos.y > offset.y + displaySize.y)
+            if (m_ViewportTexture && m_ViewportTexture->m_Id != 0)
             {
-                return;
-            }
+                float textureAspect = (float)m_ViewportTexture->m_Width / (float)m_ViewportTexture->m_Height;
+                float windowAspect = viewportSize.x / viewportSize.y;
 
-            localMousePos.x -= offset.x;
-            localMousePos.y -= offset.y;
+                ImVec2 displaySize = viewportSize;
+                if (textureAspect > windowAspect)
+                    displaySize.y = viewportSize.x / textureAspect;
+                else
+                    displaySize.x = viewportSize.y * textureAspect;
 
-            ndc.x = (2.0f * localMousePos.x) / displaySize.x - 1.0f;
-            ndc.y = 1.0f - (2.0f * localMousePos.y) / displaySize.y;
-        }
+                ImVec2 offset;
+                offset.x = (viewportSize.x - displaySize.x) * 0.5f;
+                offset.y = (viewportSize.y - displaySize.y) * 0.5f;
 
-        MainCamera* cam = MainCamera::Instance();
-        glm::mat4 invView = glm::inverse(cam->GetCamera()->m_ViewMatrix);
-        glm::mat4 invProj = glm::inverse(cam->GetCamera()->m_ProjectionMatrix);
-
-        glm::vec4 rayClip = glm::vec4(ndc.x, ndc.y, -1.0f, 1.0f);
-        glm::vec4 rayEye = invProj * rayClip;
-        rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
-
-        glm::vec3 rayDir = glm::normalize(glm::vec3(invView * rayEye));
-        glm::vec3 rayOrigin = glm::vec3(invView[3]);
-
-        StaticMesh* bestMesh = nullptr;
-        float bestDist = FLT_MAX;
-
-        std::function<void(SceneComponent*)> testComponent;
-        testComponent = [&](SceneComponent* comp)
-            {
-                if (!comp)
+                if (localMousePos.x < offset.x || localMousePos.x > offset.x + displaySize.x ||
+                    localMousePos.y < offset.y || localMousePos.y > offset.y + displaySize.y)
                     return;
 
-                if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(comp))
+                localMousePos.x -= offset.x;
+                localMousePos.y -= offset.y;
+
+                ndc.x = (2.0f * localMousePos.x) / displaySize.x - 1.0f;
+                ndc.y = 1.0f - (2.0f * localMousePos.y) / displaySize.y;
+            }
+
+            glm::mat4 invView = glm::inverse(camera->m_ViewMatrix);
+            glm::mat4 invProj = glm::inverse(camera->m_ProjectionMatrix);
+
+            glm::vec4 rayClip = glm::vec4(ndc.x, ndc.y, -1.0f, 1.0f);
+            glm::vec4 rayEye = invProj * rayClip;
+            rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
+
+            glm::vec3 rayDir = glm::normalize(glm::vec3(invView * rayEye));
+            glm::vec3 rayOrigin = glm::vec3(invView[3]);
+
+            StaticMesh* bestMesh = nullptr;
+            float bestDist = FLT_MAX;
+
+            std::function<void(SceneComponent*)> testComponent;
+            testComponent = [&](SceneComponent* comp)
                 {
-                    glm::mat4 world = mesh->GetWorldMatrix();
-                    glm::vec3 aabbMin = glm::vec3(world * glm::vec4(mesh->m_Bounds.m_Min, 1.0f));
-                    glm::vec3 aabbMax = glm::vec3(world * glm::vec4(mesh->m_Bounds.m_Max, 1.0f));
+                    if (!comp) return;
 
-                    float tAABB;
-                    if (!RayIntersectsAABB(rayOrigin, rayDir, aabbMin, aabbMax, tAABB))
-                        return;
-
-                    const auto& vertices = mesh->GetVertices();
-                    const auto& indices = mesh->GetIndices();
-
-                    for (size_t i = 0; i < indices.size(); i += 3)
+                    if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(comp))
                     {
-                        glm::vec3 p0 = glm::vec3(world * glm::vec4(vertices[indices[i]].m_Position, 1.0f));
-                        glm::vec3 p1 = glm::vec3(world * glm::vec4(vertices[indices[i + 1]].m_Position, 1.0f));
-                        glm::vec3 p2 = glm::vec3(world * glm::vec4(vertices[indices[i + 2]].m_Position, 1.0f));
+                        glm::mat4 world = mesh->GetWorldMatrix();
+                        glm::vec3 aabbMin = glm::vec3(world * glm::vec4(mesh->m_Bounds.m_Min, 1.0f));
+                        glm::vec3 aabbMax = glm::vec3(world * glm::vec4(mesh->m_Bounds.m_Max, 1.0f));
 
-                        float tTri;
-                        if (RayIntersectsTriangle(rayOrigin, rayDir, p0, p1, p2, tTri))
+                        float tAABB;
+                        if (!RayIntersectsAABB(rayOrigin, rayDir, aabbMin, aabbMax, tAABB))
+                            return;
+
+                        const auto& vertices = mesh->GetVertices();
+                        const auto& indices = mesh->GetIndices();
+
+                        for (size_t i = 0; i < indices.size(); i += 3)
                         {
-                            if (tTri < bestDist && tTri > 0.0f)
+                            glm::vec3 p0 = glm::vec3(world * glm::vec4(vertices[indices[i]].m_Position, 1.0f));
+                            glm::vec3 p1 = glm::vec3(world * glm::vec4(vertices[indices[i + 1]].m_Position, 1.0f));
+                            glm::vec3 p2 = glm::vec3(world * glm::vec4(vertices[indices[i + 2]].m_Position, 1.0f));
+
+                            float tTri;
+                            if (RayIntersectsTriangle(rayOrigin, rayDir, p0, p1, p2, tTri))
                             {
-                                bestDist = tTri;
-                                bestMesh = mesh;
+                                if (tTri < bestDist && tTri > 0.0f)
+                                {
+                                    bestDist = tTri;
+                                    bestMesh = mesh;
+                                }
                             }
                         }
                     }
+
+                    for (auto* child : comp->m_Children)
+                        testComponent(child);
+                };
+
+            for (auto& component : Scene::Instance()->GetChildren())
+            {
+                if (!component) continue;
+                testComponent(component);
+            }
+
+            if (bestMesh)
+            {
+                if (io.KeyCtrl)
+                    editor->AddSelectedComponent(bestMesh);
+                else if (io.KeyShift)
+                {
+                    if (editor->IsComponentSelected(bestMesh))
+                        editor->RemoveSelectedComponent(bestMesh);
+                    else
+                        editor->AddSelectedComponent(bestMesh);
                 }
-
-                for (auto* child : comp->m_Children)
-                    testComponent(child);
-            };
-
-        for (auto& component : Scene::Instance()->GetChildren())
-        {
-            if (!component)
-                continue;
-
-            testComponent(component);
+                else
+                    editor->SetSelectedComponent(bestMesh);
+            }
+            else if (!io.KeyCtrl && !io.KeyShift)
+                editor->ClearSelection();
         }
-
-        if (bestMesh)
-        {
-            Editor::Instance()->m_SelectedComponent = bestMesh;
-        }
-        else
-        {
-            Editor::Instance()->m_SelectedComponent = nullptr;
-        }
-
     }
 }
