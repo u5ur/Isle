@@ -15,6 +15,14 @@ namespace Isle
         class AssetBrowser;
         class TransformWidget;
         class CommandHistory;
+        class CodeView;
+        class TabBar;
+
+        enum class ViewMode
+        { 
+            VIEWPORT, 
+            CODEVIEW 
+        };
 
     private:
         std::vector<SceneComponent*> m_SelectedComponents;
@@ -27,6 +35,10 @@ namespace Isle
         AssetBrowser* m_AssetBrowser;
         TransformWidget* m_TransformWidget;
         CommandHistory* m_Commands;
+        CodeView* m_CodeView;
+        TabBar* m_TabBar;
+
+        ViewMode m_CurrentViewMode = ViewMode::VIEWPORT;
 
         std::vector<EditorComponent*> m_Components;
         ImVec2 m_ViewportPos;

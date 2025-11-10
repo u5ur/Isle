@@ -4,12 +4,9 @@
 
 namespace Isle
 {
-    static int m_NumMaterials = 0;
-
     Material::Material()
     {
-        m_NumMaterials++;
-        m_Version = m_NumMaterials;
+
     }
 
     void Material::Bind()
@@ -53,7 +50,7 @@ namespace Isle
     void Material::SetTexture(const std::string& name, Texture* texture)
     {
         m_Textures[name] = Ref<Texture>(texture);
-        m_Version++;
+        MarkDirty();
     }
 
     void Material::SetBaseColorFactor(const glm::vec4& value)
@@ -61,7 +58,7 @@ namespace Isle
         if (m_BaseColorFactor != value)
         {
             m_BaseColorFactor = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -70,7 +67,7 @@ namespace Isle
         if (m_MetallicFactor != value)
         {
             m_MetallicFactor = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -79,7 +76,7 @@ namespace Isle
         if (m_RoughnessFactor != value)
         {
             m_RoughnessFactor = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -88,7 +85,7 @@ namespace Isle
         if (m_EmissiveFactor != value)
         {
             m_EmissiveFactor = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -97,7 +94,7 @@ namespace Isle
         if (m_NormalScale != value)
         {
             m_NormalScale = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -106,7 +103,7 @@ namespace Isle
         if (m_OcclusionStrength != value)
         {
             m_OcclusionStrength = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -115,7 +112,7 @@ namespace Isle
         if (m_EmissiveStrength != value)
         {
             m_EmissiveStrength = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -124,7 +121,7 @@ namespace Isle
         if (m_Transparent != value)
         {
             m_Transparent = value;
-            m_Version++;
+            MarkDirty();
         }
     }
 
@@ -133,7 +130,17 @@ namespace Isle
         if (m_IOR != value)
         {
             m_IOR = value;
-            m_Version++;
+            MarkDirty();
         }
+    }
+
+    bool Material::IsDirty()
+    {
+        return m_Dirty;
+    }
+        
+    void Material::MarkDirty(bool value)
+    {
+        m_Dirty = value;
     }
 }

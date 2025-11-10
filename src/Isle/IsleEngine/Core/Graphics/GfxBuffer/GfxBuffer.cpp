@@ -229,7 +229,7 @@ namespace Isle
 
     void GfxBuffer::Upload()
     {
-        if (!m_Id || m_LocalData.empty())
+        if (!m_Id || m_LocalData.empty() || !m_Dirty)
             return;
 
         glBindBuffer(m_Target, m_Id);

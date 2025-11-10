@@ -1,4 +1,3 @@
-// Scene.cpp - Safe implementation
 #include "Scene.h"
 #include <Core/Graphics/Mesh/StaticMesh.h>
 #include <Core/Light/Light.h>
@@ -10,21 +9,131 @@ namespace Isle
 {
     void Scene::Start()
     {
-        auto children = GetChildren();
-        for (auto& child : children)
+        for (auto& child : GetChildren())
         {
-            StartComponent(child);
-        }
+            if (!child || !child->IsValid())
+                continue;
 
-        m_NeedsPipelineUpload = true;
+            m_Components[child] = { child, ComponentState::PendingStart, false };
+            m_ProcessQueue.push(child);
+        }
+        m_IsUploading = true;
     }
 
     void Scene::Update(float delta_time)
     {
-        auto children = GetChildren();
-        for (auto& child : children)
+        // Process everything in batches - no artificial frame limits
+        while (!m_ProcessQueue.empty())
         {
-            UpdateComponent(child, delta_time);
+            // Collect all components to start
+            std::vector<SceneComponent*> toStart;
+            std::vector<SceneComponent*> toUpload;
+
+            size_t queueSize = m_ProcessQueue.size();
+            for (size_t i = 0; i < queueSize; ++i)
+            {
+                SceneComponent* comp = m_ProcessQueue.front();
+                m_ProcessQueue.pop();
+
+                if (!comp || !comp->IsValid())
+                    continue;
+
+                auto it = m_Components.find(comp);
+                if (it == m_Components.end())
+                    continue;
+
+                ComponentInfo& info = it->second;
+
+                if (info.state == ComponentState::PendingStart)
+                {
+                    toStart.push_back(comp);
+                }
+                else if (info.state == ComponentState::PendingUpload)
+                {
+                    toUpload.push_back(comp);
+                }
+            }
+
+            // Batch start all components
+            for (auto* comp : toStart)
+            {
+                StartComponent(comp);
+                auto it = m_Components.find(comp);
+                if (it != m_Components.end())
+                {
+                    it->second.state = ComponentState::PendingUpload;
+                    m_ProcessQueue.push(comp);
+                }
+            }
+
+            // Batch upload all components to pipeline
+            if (!toUpload.empty())
+            {
+                auto pipeline = Render::Instance()->GetPipeline();
+                if (pipeline)
+                {
+                    // Group by type for efficient pipeline operations
+                    std::vector<StaticMesh*> meshes;
+                    std::vector<Light*> lights;
+                    Camera* camera = nullptr;
+
+                    for (auto* comp : toUpload)
+                    {
+                        if (auto* mesh = dynamic_cast<StaticMesh*>(comp))
+                            meshes.push_back(mesh);
+                        else if (auto* light = dynamic_cast<Light*>(comp))
+                            lights.push_back(light);
+                        else if (auto* cam = dynamic_cast<Camera*>(comp))
+                            camera = cam;
+
+                        // Handle children
+                        for (auto& child : comp->GetChildren())
+                        {
+                            if (!child || !child->IsValid())
+                                continue;
+
+                            if (m_Components.count(child) == 0)
+                            {
+                                m_Components[child] = { child, ComponentState::PendingStart, false };
+                                m_ProcessQueue.push(child);
+                            }
+                        }
+                    }
+
+                    // Batch add to pipeline
+                    for (auto* mesh : meshes)
+                        pipeline->AddStaticMesh(mesh);
+                    for (auto* light : lights)
+                        pipeline->AddLight(light);
+                    if (camera)
+                        pipeline->SetCamera(camera);
+                }
+
+                // Mark all as active
+                for (auto* comp : toUpload)
+                {
+                    auto it = m_Components.find(comp);
+                    if (it != m_Components.end())
+                        it->second.state = ComponentState::Active;
+                }
+            }
+
+            // If no new work was queued, we're done
+            if (toStart.empty() && toUpload.empty())
+                break;
+        }
+
+        m_IsUploading = !m_ProcessQueue.empty();
+
+        // Update all active components
+        for (auto* child : GetChildren())
+        {
+            if (!child || !child->IsValid())
+                continue;
+
+            auto it = m_Components.find(child);
+            if (it != m_Components.end() && it->second.state == ComponentState::Active)
+                UpdateComponent(child, delta_time);
         }
     }
 
@@ -35,20 +144,16 @@ namespace Isle
 
     void Scene::Add(SceneComponent* component, bool takeOwnership)
     {
-        if (!component)
+        if (!component || !component->IsValid())
             return;
 
-        if (IsManaged(component))
+        if (m_Components.count(component))
             return;
 
         AddChild(component);
-
-        if (takeOwnership)
-            m_OwnedComponents.insert(component);
-        else
-            m_ReferencedComponents.insert(component);
-
-        m_NeedsPipelineUpload = true;
+        m_Components[component] = { component, ComponentState::PendingStart, takeOwnership };
+        m_ProcessQueue.push(component);
+        m_IsUploading = true;
     }
 
     void Scene::Remove(SceneComponent* component, bool deleteIt)
@@ -56,113 +161,92 @@ namespace Isle
         if (!component)
             return;
 
-        if (!IsManaged(component))
+        auto it = m_Components.find(component);
+        if (it == m_Components.end())
             return;
 
         RemoveChild(component);
 
-        bool wasOwned = m_OwnedComponents.erase(component) > 0;
-        m_ReferencedComponents.erase(component);
+        bool wasOwned = it->second.owned;
+        m_Components.erase(it);
 
         if (deleteIt && wasOwned)
-        {
             DestroyComponent(component, true);
-        }
-
-        m_NeedsPipelineUpload = true;
     }
 
     void Scene::ClearAll()
     {
         for (auto* child : m_Children)
         {
-            if (child)
-            {
+            if (child && child->IsValid())
                 child->m_Owner = nullptr;
-            }
         }
 
-        for (auto* component : m_OwnedComponents)
+        std::vector<SceneComponent*> toDelete;
+        for (auto& [comp, info] : m_Components)
         {
-            if (component)
-            {
-                SafeDelete(component);
-            }
+            if (comp && info.owned)
+                toDelete.push_back(comp);
         }
 
-        m_ReferencedComponents.clear();
-        m_OwnedComponents.clear();
+        for (auto* comp : toDelete)
+        {
+            SafeDelete(comp);
+        }
+
+        m_Components.clear();
+        while (!m_ProcessQueue.empty())
+            m_ProcessQueue.pop();
         m_Children.clear();
-        m_NeedsPipelineUpload = true;
+        m_IsUploading = false;
     }
 
     bool Scene::IsManaged(SceneComponent* component) const
     {
-        if (!component)
-            return false;
-
-        return m_OwnedComponents.count(component) > 0 ||
-            m_ReferencedComponents.count(component) > 0;
+        return component && component->IsValid() && m_Components.count(component) > 0;
     }
 
     bool Scene::IsOwned(SceneComponent* component) const
     {
-        if (!component)
+        if (!component || !component->IsValid())
             return false;
 
-        return m_OwnedComponents.count(component) > 0;
-    }
-
-    void Scene::UploadToPipeline()
-    {
-        if (!m_NeedsPipelineUpload)
-            return;
-
-        auto pipeline = Render::Instance()->GetPipeline();
-        if (!pipeline)
-            return;
-
-        auto children = GetChildren();
-        for (auto& child : children)
-        {
-            UploadComponentToPipeline(child);
-        }
-
-        m_NeedsPipelineUpload = false;
+        auto it = m_Components.find(component);
+        return it != m_Components.end() && it->second.owned;
     }
 
     void Scene::UploadComponentToPipeline(SceneComponent* component)
     {
-        if (!component)
+        if (!component || !component->IsValid())
             return;
 
         auto pipeline = Render::Instance()->GetPipeline();
         if (!pipeline)
             return;
 
-        if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(component))
-        {
+        if (auto* mesh = dynamic_cast<StaticMesh*>(component))
             pipeline->AddStaticMesh(mesh);
-        }
-        else if (Light* light = dynamic_cast<Light*>(component))
-        {
+        else if (auto* light = dynamic_cast<Light*>(component))
             pipeline->AddLight(light);
-        }
-        else if (Camera* camera = dynamic_cast<Camera*>(component))
-        {
+        else if (auto* camera = dynamic_cast<Camera*>(component))
             pipeline->SetCamera(camera);
-        }
 
-        auto children = component->GetChildren();
-        for (auto& child : children)
+        for (auto& child : component->GetChildren())
         {
-            UploadComponentToPipeline(child);
+            if (!child || !child->IsValid())
+                continue;
+
+            if (m_Components.count(child) == 0)
+            {
+                m_Components[child] = { child, ComponentState::PendingStart, false };
+                m_ProcessQueue.push(child);
+            }
         }
     }
 
     void Scene::StartComponent(SceneComponent* component)
     {
-        if (!component)
+        if (!component || !component->IsValid())
             return;
 
         try
@@ -173,19 +257,17 @@ namespace Isle
         {
             ISLE_ERROR("Exception starting component '%s': %s\n",
                 component->GetName().c_str(), e.what());
-            return;
         }
-
-        auto children = component->GetChildren();
-        for (auto& child : children)
+        catch (...)
         {
-            StartComponent(child);
+            ISLE_ERROR("Unknown exception starting component '%s'\n",
+                component->GetName().c_str());
         }
     }
 
     void Scene::UpdateComponent(SceneComponent* component, float delta_time)
     {
-        if (!component)
+        if (!component || !component->IsValid())
             return;
 
         try
@@ -198,28 +280,32 @@ namespace Isle
                 component->GetName().c_str(), e.what());
             return;
         }
+        catch (...)
+        {
+            ISLE_ERROR("Unknown exception updating component '%s'\n",
+                component->GetName().c_str());
+            return;
+        }
 
         auto pipeline = Render::Instance()->GetPipeline();
         if (pipeline)
         {
-            if (MainCamera* camera = dynamic_cast<MainCamera*>(component))
-            {
-                pipeline->SetCamera(camera->GetCamera());
-            }
-            else if (StaticMesh* mesh = dynamic_cast<StaticMesh*>(component))
-            {
+            if (auto* mainCam = dynamic_cast<MainCamera*>(component))
+                pipeline->SetCamera(mainCam->GetCamera());
+            else if (auto* mesh = dynamic_cast<StaticMesh*>(component))
                 pipeline->UpdateStaticMesh(mesh);
-            }
-            else if (Light* light = dynamic_cast<Light*>(component))
-            {
+            else if (auto* light = dynamic_cast<Light*>(component))
                 pipeline->UpdateLight(light);
-            }
         }
 
-        auto children = component->GetChildren();
-        for (auto& child : children)
+        for (auto& child : component->GetChildren())
         {
-            UpdateComponent(child, delta_time);
+            if (!child || !child->IsValid())
+                continue;
+
+            auto it = m_Components.find(child);
+            if (it != m_Components.end() && it->second.state == ComponentState::Active)
+                UpdateComponent(child, delta_time);
         }
     }
 
@@ -230,28 +316,37 @@ namespace Isle
 
         try
         {
-            auto children = component->GetChildren();
-            for (SceneComponent* child : children)
-            {
-                bool ownChild = m_OwnedComponents.count(child) > 0;
+            std::vector<SceneComponent*> children = component->GetChildren();
 
-                if (child)
-                {
-                    DestroyComponent(child, ownChild);
-                }
+            for (auto* child : children)
+            {
+                if (!child)
+                    continue;
+
+                auto it = m_Components.find(child);
+                bool ownChild = it != m_Components.end() && it->second.owned;
+
+                if (it != m_Components.end())
+                    m_Components.erase(it);
+
+                DestroyComponent(child, ownChild);
             }
 
-            component->Destroy();
+            if (component->IsValid())
+                component->Destroy();
 
             if (deleteIt)
-            {
                 delete component;
-            }
         }
         catch (const std::exception& e)
         {
             ISLE_ERROR("Exception destroying component '%s': %s\n",
                 component->GetName().c_str(), e.what());
+        }
+        catch (...)
+        {
+            ISLE_ERROR("Unknown exception destroying component '%s'\n",
+                component->GetName().c_str());
         }
     }
 
@@ -262,27 +357,40 @@ namespace Isle
 
         try
         {
-            auto children = component->GetChildren();
+            std::vector<SceneComponent*> children = component->GetChildren();
 
-            for (SceneComponent* child : children)
+            for (auto* child : children)
             {
-                if (child)
+                if (!child)
+                    continue;
+
+                auto it = m_Components.find(child);
+                if (it != m_Components.end())
                 {
-                    if (m_OwnedComponents.count(child) > 0)
+                    if (it->second.owned)
                     {
+                        m_Components.erase(it);
                         SafeDelete(child);
-                        m_OwnedComponents.erase(child);
                     }
                     else
                     {
-                        child->m_Owner = nullptr;
+                        if (child->IsValid())
+                            child->m_Owner = nullptr;
+                        m_Components.erase(it);
                     }
+                }
+                else if (child->IsValid())
+                {
+                    child->m_Owner = nullptr;
                 }
             }
 
             component->m_Children.clear();
             component->m_Owner = nullptr;
-            component->Destroy();
+
+            if (component->IsValid())
+                component->Destroy();
+
             delete component;
         }
         catch (const std::exception& e)

@@ -1,4 +1,3 @@
-// Editor.cpp
 #include "Editor.h"
 #include <Core/ModuleManager/ModuleManager.h>
 #include <Core/EditorApplication/EditorApplication.h>
@@ -9,6 +8,8 @@
 #include <Core/Editor/Navbar/Navbar.h>
 #include <Core/Editor/SceneHierarchy/SceneHierarchy.h>
 #include <Core/Editor/AssetBrowser/AssetBrowser.h>
+#include <Core/Editor/CodeView/CodeView.h>
+#include <Core/Editor/TabBar/TabBar.h>
 
 namespace Isle
 {
@@ -67,6 +68,19 @@ namespace Isle
         m_AssetBrowser->SetDockConstraints(assetBrowserDock);
         m_AssetBrowser->Start();
 
+        m_TabBar = new TabBar();
+        DockConstraints tabBarDock;
+        tabBarDock.m_Side = DOCK_SIDE::TOP;
+        tabBarDock.m_PreferredSize = 30.0f;
+        tabBarDock.m_MinSize = 30.0f;
+        tabBarDock.m_MaxSize = 30.0f;
+        tabBarDock.m_CanResize = false;
+        tabBarDock.m_CanMove = false;
+        tabBarDock.m_Showtitle = false;
+        tabBarDock.m_Priority = 99;
+        m_TabBar->SetDockConstraints(tabBarDock);
+        m_TabBar->Start();
+
         m_Viewport = new Viewport();
         DockConstraints viewportDock;
         viewportDock.m_Side = DOCK_SIDE::FILL;
@@ -77,19 +91,31 @@ namespace Isle
         m_Viewport->SetDockConstraints(viewportDock);
         m_Viewport->Start();
 
+        m_CodeView = new CodeView();
+        DockConstraints codeViewDock;
+        codeViewDock.m_Side = DOCK_SIDE::FILL;
+        codeViewDock.m_CanResize = false;
+        codeViewDock.m_CanMove = false;
+        codeViewDock.m_Showtitle = false;
+        codeViewDock.m_Priority = 10;
+        m_CodeView->SetDockConstraints(codeViewDock);
+        m_CodeView->Start();
+
         m_TransformWidget = new TransformWidget();
         m_TransformWidget->Start();
 
         m_AssetBrowser->Start();
 
         m_Components.push_back(m_Navbar);
+        m_Components.push_back(m_TabBar);
         m_Components.push_back(m_Properties);
         m_Components.push_back(m_Scene);
         m_Components.push_back(m_AssetBrowser);
         m_Components.push_back(m_Viewport);
+        m_Components.push_back(m_CodeView);
+
+        m_CurrentViewMode = ViewMode::VIEWPORT;
     }
-
-
 
     void Editor::Update()
     {
@@ -108,20 +134,30 @@ namespace Isle
         HandleResizing();
 
         RenderComponent(m_Navbar);
+        RenderComponent(m_TabBar);
         RenderComponent(m_Scene);
         RenderComponent(m_Properties);
         RenderComponent(m_AssetBrowser);
-        RenderComponent(m_Viewport);
 
-        m_TransformWidget->Update();
+        if (m_CurrentViewMode == ViewMode::VIEWPORT)
+        {
+            RenderComponent(m_Viewport);
+            m_TransformWidget->Update();
+        }
+        else
+        {
+            RenderComponent(m_CodeView);
+        }
     }
 
     void Editor::Destroy()
     {
         m_Navbar->Destroy();
+        m_TabBar->Destroy();
         m_Properties->Destroy();
         m_Scene->Destroy();
         m_Viewport->Destroy();
+        m_CodeView->Destroy();
         m_AssetBrowser->Destroy();
         m_Commands->Destroy();
     }
@@ -398,7 +434,7 @@ namespace Isle
 
         const DockConstraints& dock = component->GetDockConstraints();
 
-        ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar;
 
         if (!dock.m_Showtitle)
         {

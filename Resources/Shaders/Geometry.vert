@@ -3,6 +3,7 @@
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_ARB_bindless_texture : require
 #extension GL_ARB_gpu_shader_int64 : enable
+
 #include "Common/Common.glsl"
 
 layout(location = 0) out vec3 Out_WorldPos;
@@ -17,18 +18,20 @@ void main()
 {
     uint meshIndex = gl_BaseInstance;
     GpuStaticMesh mesh = meshes[meshIndex];
-    GpuVertex v = vertices[gl_VertexID];
-
+    GpuVertex vertex = vertices[gl_VertexID];
+    
+    UnpackedVertex v = unpackVertex(vertex);
+    
     mat3 normalMat = mat3(mesh.m_NormalMatrix);
-    vec4 worldPos = mesh.m_Transform * vec4(v.m_Position, 1.0);
-
+    vec4 worldPos = mesh.m_Transform * vec4(v.position, 1.0);
+    
     Out_WorldPos = worldPos.xyz;
-    Out_Normal = normalize(normalMat * v.m_Normal);
-    Out_Tangent = normalize(normalMat * v.m_Tangent);
-    Out_Bitangent = normalize(normalMat * v.m_BitTangent);
-    Out_TexCoord = v.m_TexCoord;
+    Out_Normal = normalize(normalMat * v.normal);
+    Out_Tangent = normalize(normalMat * v.tangent);
+    Out_Bitangent = normalize(normalMat * v.bitangent);
+    Out_TexCoord = v.texCoord;
     Out_MaterialIndex = mesh.m_MaterialIndex;
     Out_MeshIndex = meshIndex;
-
+    
     gl_Position = camera.m_ProjectionMatrix * camera.m_ViewMatrix * worldPos;
 }

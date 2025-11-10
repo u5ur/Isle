@@ -8,7 +8,6 @@ namespace Isle
     void MainCamera::Start()
     {
         SetName("MainCamera");
-        m_CurrentCamera = nullptr;
     }
 
     void MainCamera::Update(float delta_time)

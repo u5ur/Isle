@@ -12,8 +12,6 @@ namespace Isle
     {
     public:
         int m_Id = -1;
-        uint32_t m_Version = 0;
-
         Ref<Shader> m_Shader = nullptr;
         Ref<PipelineState> m_PipelineState = nullptr;
         std::map<std::string, Ref<Texture>> m_Textures;
@@ -28,6 +26,7 @@ namespace Isle
         float m_EmissiveStrength = 1.0f;
         float m_IOR = 1.0f;
         bool m_Transparent = false;
+        bool m_Dirty = true;
 
     public:
         Material();
@@ -36,8 +35,8 @@ namespace Isle
 
         Ref<Texture> GetTexture(const std::string& name);
         void SetTexture(const std::string& name, Texture* texture);
-        void SetShader(Ref<Shader> shader) { m_Shader = shader; m_Version++; }
-        void SetPipelineState(Ref<PipelineState> state) { m_PipelineState = state; m_Version++; }
+        void SetShader(Ref<Shader> shader) { m_Shader = shader; }
+        void SetPipelineState(Ref<PipelineState> state) { m_PipelineState = state; }
 
         void SetBaseColorFactor(const glm::vec4& value);
         void SetMetallicFactor(float value);
@@ -58,5 +57,8 @@ namespace Isle
         float GetEmissiveStrength() const { return m_EmissiveStrength; }
         float GetIOR() const { return m_IOR; }
         bool GetTransparent() const { return m_Transparent; }
+
+        bool IsDirty();
+        void MarkDirty(bool value = true);
     };
 }

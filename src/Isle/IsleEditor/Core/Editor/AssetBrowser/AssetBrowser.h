@@ -40,12 +40,15 @@ namespace Isle
         int m_DraggedAssetId = -1;
         std::string m_DragDropPayloadType = "ASSET_ROOT_OBJECT";
 
+        int m_CurrentAssetId = -1;
+        int m_LastAssetCount = 0;
+
     public:
         virtual void Start() override;
         virtual void Update() override;
         virtual void Destroy() override;
         virtual const char* GetWindowName() const override { return "Asset Browser"; }
-        
+
     private:
         void RebuildVFS();
         void BuildFolderStructure();
@@ -61,8 +64,10 @@ namespace Isle
         const char* GetAssetIcon(const std::string& type);
         ImVec4 GetAssetColor(const std::string& type);
         std::vector<AssetEntry*> GetAssetsInCurrentFolder();
+        std::vector<AssetEntry*> GetObjectsInAsset(int assetId);
 
         void HandleAssetDragAndDrop(AssetEntry* entry);
+        void HandleRootAssetDragAndDrop(int assetId);
         void ProcessAssetDrop();
     };
 
@@ -70,6 +75,8 @@ namespace Isle
     {
         m_RootFolder = new VFSFolder{ "Root", "/", {}, {}, nullptr };
         m_CurrentFolder = m_RootFolder;
+        m_CurrentAssetId = -1;
+        m_LastAssetCount = 0;
         RebuildVFS();
     }
 
@@ -130,7 +137,6 @@ namespace Isle
         BuildFolderStructure();
     }
 
-
     void Editor::AssetBrowser::BuildFolderStructure()
     {
         for (auto& entry : m_CachedAssets)
@@ -150,7 +156,6 @@ namespace Isle
             folder->assetIds.push_back(entry.id);
         }
     }
-
 
     Editor::AssetBrowser::VFSFolder* Editor::AssetBrowser::GetOrCreateFolder(const std::string& vfsPath)
     {
@@ -222,14 +227,34 @@ namespace Isle
             return;
         }
 
+        if (assetManager->m_Assets.size() != m_LastAssetCount)
+        {
+            RebuildVFS();
+            m_LastAssetCount = assetManager->m_Assets.size();
+        }
+
         DrawSplitView();
     }
+
 
     void Editor::AssetBrowser::DrawSplitView()
     {
         ImGui::BeginChild("FolderTree", ImVec2(250, 0), true);
+
+        if (m_CurrentAssetId != -1)
+        {
+            if (ImGui::Button("< Back to Assets"))
+            {
+                m_CurrentAssetId = -1;
+            }
+            ImGui::Separator();
+        }
+
         if (ImGui::Button("Reload Assets"))
+        {
             RebuildVFS();
+            m_CurrentAssetId = -1;
+        }
 
         ImGui::Separator();
         DrawFolderTree(m_RootFolder);
@@ -256,27 +281,38 @@ namespace Isle
         if (isRoot)
         {
             ImGui::TextUnformatted("Assets");
+            ImGui::Separator();
 
             AssetManager* assetManager = AssetManager::Instance();
             if (assetManager)
             {
                 for (auto& [assetId, asset] : assetManager->m_Assets)
                 {
-                    if (!asset || !asset->m_RootObject) 
+                    if (!asset || !asset->m_RootObject)
                         continue;
 
                     std::string assetName = asset->GetName().empty() ?
                         ("Asset_" + std::to_string(assetId)) : asset->GetName();
 
-                    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-                    bool open = ImGui::TreeNodeEx((void*)asset, flags, "%s", assetName.c_str());
+                    bool isCurrent = (m_CurrentAssetId == assetId);
+                    if (isCurrent)
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
+                    if (isCurrent)
+                        flags |= ImGuiTreeNodeFlags_Selected;
+
+                    bool open = ImGui::TreeNodeEx((void*)(intptr_t)assetId, flags, "%s", assetName.c_str());
+
+                    if (isCurrent)
+                        ImGui::PopStyleColor();
+
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
                     {
-                        ImGui::SetDragDropPayload(m_DragDropPayloadType.c_str(), &assetId, sizeof(int));
-                        ImGui::Text("[A] %s", assetName.c_str());
-                        ImGui::EndDragDropSource();
+                        m_CurrentAssetId = assetId;
                     }
+
+                    HandleRootAssetDragAndDrop(assetId);
 
                     if (open)
                         ImGui::TreePop();
@@ -285,7 +321,6 @@ namespace Isle
             return;
         }
     }
-
 
     std::vector<Editor::AssetBrowser::AssetEntry*> Editor::AssetBrowser::GetAssetsInCurrentFolder()
     {
@@ -305,6 +340,35 @@ namespace Isle
         return result;
     }
 
+    std::vector<Editor::AssetBrowser::AssetEntry*> Editor::AssetBrowser::GetObjectsInAsset(int assetId)
+    {
+        std::vector<AssetEntry*> result;
+
+        AssetManager* assetManager = AssetManager::Instance();
+        if (!assetManager)
+            return result;
+
+        auto assetIt = assetManager->m_Assets.find(assetId);
+        if (assetIt == assetManager->m_Assets.end())
+            return result;
+
+        Asset* asset = assetIt->second;
+
+        for (auto& entry : m_CachedAssets)
+        {
+            for (auto& [objId, obj] : asset->m_Objects)
+            {
+                if (obj == entry.obj)
+                {
+                    result.push_back(&entry);
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
     void Editor::AssetBrowser::DrawAssetGrid()
     {
         AssetManager* assetManager = AssetManager::Instance();
@@ -314,7 +378,15 @@ namespace Isle
             return;
         }
 
-        bool hasAssets = false;
+        if (m_CurrentAssetId != -1)
+        {
+            auto assetIt = assetManager->m_Assets.find(m_CurrentAssetId);
+            if (assetIt != assetManager->m_Assets.end())
+            {
+                ImGui::Text("Asset: %s", assetIt->second->GetName().c_str());
+                ImGui::Separator();
+            }
+        }
 
         ImVec2 contentRegion = ImGui::GetContentRegionAvail();
         float cellSize = m_ThumbnailSize + 40.0f;
@@ -322,83 +394,238 @@ namespace Isle
 
         ImGui::BeginChild("GridScroll", ImVec2(0, 0), false);
 
-        for (auto& [assetId, asset] : assetManager->m_Assets)
+        if (m_CurrentAssetId != -1)
         {
-            if (!asset || !asset->m_RootObject) continue;
+            auto objects = GetObjectsInAsset(m_CurrentAssetId);
 
-            hasAssets = true;
-
-            ImGui::PushID(assetId);
-
-            if (assetId > 0 && (assetId % columns) != 0)
-                ImGui::SameLine();
-
-            ImGui::BeginGroup();
-
-            bool selected = (m_SelectedAssetId == assetId);
-            ImVec4 color = ImVec4(0.4f, 0.8f, 1.0f, 1.0f);
-
-            ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.3f, 0.5f, 0.8f, 0.5f) : ImVec4(0.2f, 0.2f, 0.2f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.8f, 0.4f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.6f, 0.9f, 0.6f));
-
-            if (ImGui::Button("##asset_thumb", ImVec2(m_ThumbnailSize, m_ThumbnailSize)))
+            if (objects.empty())
             {
-                m_SelectedAssetId = assetId;
+                ImGui::TextDisabled("No objects in this asset");
             }
-
-            ImGui::PopStyleColor(3);
-
-            ImVec2 iconPos = ImGui::GetItemRectMin();
-            ImVec2 iconSize = ImGui::GetItemRectSize();
-
-            ImGui::GetWindowDrawList()->AddText(
-                ImGui::GetFont(),
-                32.0f,
-                ImVec2(iconPos.x + (iconSize.x - ImGui::CalcTextSize("[A]").x) * 0.5f,
-                    iconPos.y + (iconSize.y - ImGui::CalcTextSize("[A]").y) * 0.5f),
-                ImGui::ColorConvertFloat4ToU32(color),
-                "[A]"
-            );
-
-            std::string displayName = asset->GetName().empty() ?
-                ("Asset_" + std::to_string(assetId)) : asset->GetName();
-            if (displayName.length() > 14)
-                displayName = displayName.substr(0, 11) + "...";
-
-            ImVec2 nameTextSize = ImGui::CalcTextSize(displayName.c_str());
-            float textPosX = (m_ThumbnailSize - nameTextSize.x) * 0.5f;
-            if (textPosX > 0)
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPosX);
-
-            ImGui::TextWrapped("%s", displayName.c_str());
-
-            ImGui::EndGroup();
-
-            if (ImGui::IsItemHovered())
+            else
             {
-                ImGui::BeginTooltip();
-                ImGui::Text("[A] %s", displayName.c_str());
-            }
+                int currentColumn = 0;
 
-            ImGui::PopID();
+                for (auto* entryPtr : objects)
+                {
+                    auto& entry = *entryPtr;
+
+                    ImGui::PushID(entry.id);
+
+                    if (currentColumn > 0)
+                        ImGui::SameLine();
+
+                    ImGui::BeginGroup();
+
+                    bool selected = (m_SelectedAssetId == entry.id);
+                    ImVec4 color = GetAssetColor(entry.type);
+
+                    ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.3f, 0.5f, 0.8f, 0.5f) : ImVec4(0.2f, 0.2f, 0.2f, 0.3f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.8f, 0.4f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.6f, 0.9f, 0.6f));
+
+                    if (ImGui::Button("##asset_thumb", ImVec2(m_ThumbnailSize, m_ThumbnailSize)))
+                    {
+                        m_SelectedAssetId = entry.id;
+                    }
+
+                    ImGui::PopStyleColor(3);
+
+                    ImVec2 iconPos = ImGui::GetItemRectMin();
+                    ImVec2 iconSize = ImGui::GetItemRectSize();
+                    const char* icon = GetAssetIcon(entry.type);
+
+                    if (entry.type == "Texture")
+                    {
+                        Texture* tex = dynamic_cast<Texture*>(entry.obj);
+                        if (tex && tex->m_Id != 0)
+                        {
+                            ImGui::GetWindowDrawList()->AddImage(
+                                (ImTextureID)(intptr_t)tex->m_Id,
+                                ImVec2(iconPos.x + 4, iconPos.y + 4),
+                                ImVec2(iconPos.x + iconSize.x - 4, iconPos.y + iconSize.y - 4),
+                                ImVec2(0, 1),
+                                ImVec2(1, 0)
+                            );
+                        }
+                        else
+                        {
+                            ImGui::GetWindowDrawList()->AddRectFilled(
+                                ImVec2(iconPos.x + 4, iconPos.y + 4),
+                                ImVec2(iconPos.x + iconSize.x - 4, iconPos.y + iconSize.y - 4),
+                                IM_COL32(60, 60, 60, 255),
+                                4.0f
+                            );
+                            ImGui::GetWindowDrawList()->AddText(
+                                ImVec2(iconPos.x + iconSize.x * 0.35f, iconPos.y + iconSize.y * 0.4f),
+                                IM_COL32(255, 255, 255, 128),
+                                "T"
+                            );
+                        }
+                    }
+                    else
+                    {
+                        const char* icon = GetAssetIcon(entry.type);
+                        ImGui::GetWindowDrawList()->AddText(
+                            ImGui::GetFont(),
+                            32.0f,
+                            ImVec2(iconPos.x + (iconSize.x - ImGui::CalcTextSize(icon).x) * 0.5f,
+                                iconPos.y + (iconSize.y - ImGui::CalcTextSize(icon).y) * 0.5f),
+                            ImGui::ColorConvertFloat4ToU32(color),
+                            icon
+                        );
+                    }
+
+                    std::string displayName = entry.name;
+                    if (displayName.length() > 14)
+                        displayName = displayName.substr(0, 11) + "...";
+
+                    ImVec2 nameTextSize = ImGui::CalcTextSize(displayName.c_str());
+                    float textPosX = (m_ThumbnailSize - nameTextSize.x) * 0.5f;
+                    if (textPosX > 0)
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPosX);
+
+                    ImGui::TextWrapped("%s", displayName.c_str());
+
+                    ImGui::EndGroup();
+
+                    HandleAssetDragAndDrop(entryPtr);
+
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("%s %s", GetAssetIcon(entry.type), entry.name.c_str());
+                        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Type: %s", entry.type.c_str());
+                        ImGui::EndTooltip();
+                    }
+
+                    ImGui::PopID();
+
+                    currentColumn++;
+                    if (currentColumn >= columns)
+                        currentColumn = 0;
+                }
+            }
         }
-
-        if (!hasAssets)
+        else
         {
-            ImGui::TextDisabled("No assets loaded");
+            bool hasAssets = false;
+            int currentColumn = 0;
+
+            for (auto& [assetId, asset] : assetManager->m_Assets)
+            {
+                if (!asset || !asset->m_RootObject) continue;
+
+                hasAssets = true;
+
+                ImGui::PushID(assetId);
+
+                if (currentColumn > 0)
+                    ImGui::SameLine();
+
+                ImGui::BeginGroup();
+
+                bool selected = (m_SelectedAssetId == assetId);
+                ImVec4 color = ImVec4(0.4f, 0.8f, 1.0f, 1.0f);
+
+                ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(0.3f, 0.5f, 0.8f, 0.5f) : ImVec4(0.2f, 0.2f, 0.2f, 0.3f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.8f, 0.4f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.6f, 0.9f, 0.6f));
+
+                if (ImGui::Button("##asset_thumb", ImVec2(m_ThumbnailSize, m_ThumbnailSize)))
+                {
+                    m_SelectedAssetId = assetId;
+                }
+
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                {
+                    m_CurrentAssetId = assetId;
+                }
+
+                ImGui::PopStyleColor(3);
+
+                ImVec2 iconPos = ImGui::GetItemRectMin();
+                ImVec2 iconSize = ImGui::GetItemRectSize();
+
+                ImGui::GetWindowDrawList()->AddText(
+                    ImGui::GetFont(),
+                    32.0f,
+                    ImVec2(iconPos.x + (iconSize.x - ImGui::CalcTextSize("[A]").x) * 0.5f,
+                        iconPos.y + (iconSize.y - ImGui::CalcTextSize("[A]").y) * 0.5f),
+                    ImGui::ColorConvertFloat4ToU32(color),
+                    "[A]"
+                );
+
+                std::string displayName = asset->GetName().empty() ?
+                    ("Asset_" + std::to_string(assetId)) : asset->GetName();
+                if (displayName.length() > 14)
+                    displayName = displayName.substr(0, 11) + "...";
+
+                ImVec2 nameTextSize = ImGui::CalcTextSize(displayName.c_str());
+                float textPosX = (m_ThumbnailSize - nameTextSize.x) * 0.5f;
+                if (textPosX > 0)
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPosX);
+
+                ImGui::TextWrapped("%s", displayName.c_str());
+
+                ImGui::EndGroup();
+
+                HandleRootAssetDragAndDrop(assetId);
+
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("[A] %s", displayName.c_str());
+                    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Double-click to view contents");
+                    ImGui::EndTooltip();
+                }
+
+                ImGui::PopID();
+
+                currentColumn++;
+                if (currentColumn >= columns)
+                    currentColumn = 0;
+            }
+
+            if (!hasAssets)
+            {
+                ImGui::TextDisabled("No assets loaded");
+            }
         }
 
         ImGui::EndChild();
+
+        ProcessAssetDrop();
+    }
+
+    void Editor::AssetBrowser::HandleRootAssetDragAndDrop(int assetId)
+    {
+        AssetManager* assetManager = AssetManager::Instance();
+        if (!assetManager)
+            return;
+
+        auto it = assetManager->m_Assets.find(assetId);
+        if (it == assetManager->m_Assets.end() || !it->second || !it->second->m_RootObject)
+            return;
+
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+        {
+            ImGui::SetDragDropPayload(m_DragDropPayloadType.c_str(), &assetId, sizeof(int));
+
+            ImGui::Text("[A] %s", it->second->GetName().c_str());
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Add to Scene");
+
+            ImGui::EndDragDropSource();
+        }
     }
 
     void Editor::AssetBrowser::HandleAssetDragAndDrop(AssetEntry* entry)
     {
-        if (!entry) 
+        if (!entry)
             return;
 
         AssetManager* assetManager = AssetManager::Instance();
-        if (!assetManager) 
+        if (!assetManager)
             return;
 
         Asset* parentAsset = nullptr;

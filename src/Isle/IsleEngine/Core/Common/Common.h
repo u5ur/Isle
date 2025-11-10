@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <cstdint>
+#include <chrono>
 #ifdef _WIN32
 #ifdef ISLEENGINE_EXPORTS
 #define ISLEENGINE_API __declspec(dllexport)

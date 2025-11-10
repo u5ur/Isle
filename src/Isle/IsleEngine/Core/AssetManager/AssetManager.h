@@ -4,7 +4,7 @@
 
 namespace Isle
 {
-	class Asset : public Object
+	class ISLEENGINE_API Asset : public Object
 	{
 	public:
 		Object* m_RootObject;

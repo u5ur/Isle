@@ -137,39 +137,45 @@ namespace Isle
             ImGui::GetWindowPos().y + 10.0f
         ));
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(40, 40, 40, 200));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(35, 35, 35, 255));
+        const RenderStats& stats = Render::Instance()->GetStats();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-        MainCamera* MainCam = MainCamera::Instance();
+        ImVec2 overlayPos = ImVec2(
+            ImGui::GetItemRectMax().x - 220.0f,
+            ImGui::GetItemRectMin().y + 10.0f
+        );
 
+        char statsText[512];
+        snprintf(statsText, sizeof(statsText),
+            "Render CPU: %.2f ms (%.0f Hz)\n"
+            "Meshes: %u | Lights: %u\n"
+            "Verts: %u | Indices: %u\n"
+            "Materials: %u | Textures: %u\n"
+            "Uploads: %u | Dirty Buffers: %u\n"
+            "VRAM: %.2f MB | Frame#: %llu",
+            stats.RenderTimeCPU,
+            stats.RenderHz(),
+            stats.MeshCount, stats.LightCount,
+            stats.VertexCount, stats.IndexCount,
+            stats.MaterialCount, stats.TextureCount,
+            stats.UploadsThisFrame, stats.DirtyBufferCount,
+            stats.VRAMUsed / (1024.0 * 1024.0),
+            stats.RenderFrameCount
+        );
 
-        static int selected = 0;
-        const char* names[] = { "Editor", "Default", "Orthographic" };
+        ImVec2 textSize = ImGui::CalcTextSize(statsText);
+        drawList->AddRectFilled(
+            overlayPos,
+            ImVec2(overlayPos.x + textSize.x + 10.0f, overlayPos.y + textSize.y + 10.0f),
+            IM_COL32(15, 15, 15, 180),
+            6.0f
+        );
+        drawList->AddText(
+            ImVec2(overlayPos.x + 5.0f, overlayPos.y + 5.0f),
+            IM_COL32(255, 255, 255, 255),
+            statsText
+        );
 
-        ImGui::SetNextItemWidth(170);
-        if (ImGui::BeginCombo("##Cam", names[selected]))
-        {
-            if (ImGui::Selectable("Editor", selected == 0)) 
-            { 
-                selected = 0; 
-                MainCamera::Instance()->SetCamera(EditorCamera::Instance()->m_Camera); 
-            }    
-            if (ImGui::Selectable("Default", selected == 1)) 
-            { 
-                selected = 1; 
-                MainCamera::Instance()->SetCamera(CameraMan::Instance()->m_Camera); 
-            }
-            if (ImGui::Selectable("Orthographic", selected == 2)) 
-            { 
-                selected = 2; 
-                MainCamera::Instance()->SetCamera(OrthographicCamera::Instance()->m_Camera); 
-            }
-            ImGui::EndCombo();
-        }
-
-        ImGui::PopStyleColor(2);
-        ImGui::PopStyleVar();
 
         HandleSelection();
     }

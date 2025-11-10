@@ -50,16 +50,49 @@ namespace Isle
         if (!component)
             return;
 
-        const std::string& name = component->GetName().empty()
-            ? "Unknown"
-            : component->GetName();
+        std::string name;
+        try
+        {
+            const std::string& rawName = component->GetName();
+
+            if (rawName.empty())
+                name = "Unnamed";
+            else
+            {
+                name.reserve(rawName.size());
+                for (unsigned char c : rawName)
+                {
+                    if (std::isprint(c) || std::isspace(c))
+                        name.push_back(static_cast<char>(c));
+                    else
+                        name.push_back('?');
+                }
+
+                if (name.size() > 128)
+                    name = name.substr(0, 128) + "...";
+            }
+        }
+        catch (...)
+        {
+            name = "CorruptedName";
+        }
 
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow |
             ImGuiTreeNodeFlags_SpanAvailWidth;
-        if (component->GetChildren().empty())
+
+        const auto& children = component->GetChildren();
+        if (children.empty())
             flags |= ImGuiTreeNodeFlags_Leaf;
 
-        bool open = ImGui::TreeNodeEx((void*)component, flags, "%s", name.c_str());
+        bool open = false;
+        try
+        {
+            open = ImGui::TreeNodeEx((void*)component, flags, "%s", name.c_str());
+        }
+        catch (...)
+        {
+            return;
+        }
 
         if (ImGui::IsItemClicked())
         {
@@ -68,12 +101,16 @@ namespace Isle
 
         if (open)
         {
-            for (auto& child : component->GetChildren())
-                DrawComponentTree(child);
+            for (auto* child : children)
+            {
+                if (child && child != component)
+                    DrawComponentTree(child);
+            }
 
             ImGui::TreePop();
         }
     }
+
 
     void Editor::SceneHierarchy::Destroy()
     {

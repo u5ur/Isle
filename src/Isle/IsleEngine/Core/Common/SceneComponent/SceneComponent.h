@@ -7,6 +7,7 @@ namespace Isle
         std::vector<SceneComponent*> m_Children;
         Transform m_Transform = Transform();
         Bounds m_Bounds = Bounds();
+        bool m_TransformDirty = true;
 
     private:
         bool m_IsDestroyed = false;
@@ -272,18 +273,24 @@ namespace Isle
         {
             if (!m_IsDestroyed)
                 m_Transform.m_Translation = pos;
+
+            MarkDirty();
         }
 
         void SetLocalRotation(const glm::quat& rot)
         {
             if (!m_IsDestroyed)
                 m_Transform.m_Rotation = rot;
+
+            MarkDirty();
         }
 
         void SetLocalScale(const glm::vec3& scl)
         {
             if (!m_IsDestroyed)
                 m_Transform.m_Scale = scl;
+
+            MarkDirty();
         }
 
         glm::vec3 GetLocalPosition() const
@@ -323,6 +330,7 @@ namespace Isle
             }
 
             m_Transform = Transform::FromMatrix(localMatrix);
+            MarkDirty();
         }
 
         glm::vec3 GetWorldPosition() const
@@ -347,6 +355,8 @@ namespace Isle
             {
                 m_Transform.m_Translation = pos;
             }
+
+            MarkDirty();
         }
 
         glm::quat GetWorldRotation() const
@@ -371,6 +381,8 @@ namespace Isle
             {
                 m_Transform.m_Rotation = rot;
             }
+
+            MarkDirty();
         }
 
         glm::vec3 GetWorldScale() const
@@ -394,6 +406,18 @@ namespace Isle
             {
                 m_Transform.m_Scale = scl;
             }
+
+            MarkDirty();
+        }
+
+        bool IsTransformDirty()
+        {
+            return m_TransformDirty;
+        }
+
+        void MarkDirty(bool value = true)
+        {
+            m_TransformDirty = value;
         }
     };
 }

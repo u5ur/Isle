@@ -1,4 +1,3 @@
-// EditorApplication.cpp
 #include "EditorApplication.h"
 #include <Core/ModuleManager/ModuleManager.h>
 #include <Core/Editor/Editor.h>
@@ -22,6 +21,8 @@ namespace Isle
         ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 
         Editor::Instance()->Start();
+        MainCamera::Instance()->Start();
+        EditorCamera::Instance()->Start();
 
         ISLE_SUCCESS("Editor Loaded!\n");
 
@@ -65,11 +66,13 @@ namespace Isle
         }
         prevEsc = esc;
 
+        EditorCamera::Instance()->Update(0.0f);
+
         m_Window->Clear(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        if (m_Game && m_SetPaused && m_UpdateFunc)
+
+        if (Application::Instance())
         {
-            m_SetPaused(m_Game, m_Paused);
-            m_UpdateFunc(m_Game);
+            Application::Instance()->Update();
         }
 
         Editor::Instance()->Update();
@@ -114,84 +117,37 @@ namespace Isle
             return false;
         }
 
-        m_CreateApp = ModuleManager::Instance()->Get<CreateAppFunc>("CreateApplication");
-        m_DestroyApp = ModuleManager::Instance()->Get<DestroyAppFunc>("DestroyApplication");
-        m_StartFunc = ModuleManager::Instance()->Get<StartFunc>("Application_Start");
-        m_UpdateFunc = ModuleManager::Instance()->Get<UpdateFunc>("Application_Update");
-        m_DestroyFunc = ModuleManager::Instance()->Get<DestroyFunc>("Application_Destroy");
-        m_SetEditorMode = ModuleManager::Instance()->Get<SetEditorModeFunc>("Application_SetEditorMode");
-        m_SetPaused = ModuleManager::Instance()->Get<SetPausedFunc>("Application_SetPaused");
-
-        if (!m_CreateApp || !m_StartFunc || !m_UpdateFunc || !m_DestroyFunc || !m_SetEditorMode || !m_SetPaused)
-        {
-            ISLE_ERROR("Failed to load game API functions from DLL\n");
-            return false;
-        }
-
         return true;
     }
 
     void EditorApplication::UnloadGameDLL()
     {
         ModuleManager::Instance()->Unload();
-
-        m_CreateApp = nullptr;
-        m_DestroyApp = nullptr;
-        m_StartFunc = nullptr;
-        m_UpdateFunc = nullptr;
-        m_DestroyFunc = nullptr;
-        m_SetEditorMode = nullptr;
-        m_SetPaused = nullptr;
     }
 
     bool EditorApplication::InitializeGame()
     {
-
-        if (!m_CreateApp)
-        {
-            ISLE_ERROR("CreateApp function not loaded\n");
-            return false;
-        }
-
         Editor::Instance()->SetViewportTexture(nullptr);
         Render::Instance()->Reset();
 
-        m_Game = m_CreateApp();
-        if (!m_Game)
+        if (!Application::Instance())
         {
-            ISLE_ERROR("Failed to create game application\n");
+            ISLE_ERROR("Game DLL did not register an Application instance\n");
             return false;
         }
 
-        m_SetEditorMode(m_Game, true);
-        Render::Instance()->SetEditorMode(true);
-
-        m_StartFunc(m_Game);
-
+        Application::Instance()->Start();
         MainCamera::Instance()->SetCamera(EditorCamera::Instance()->m_Camera);
-
-        if (Scene::Instance())
-        {
-            Scene::Instance()->UploadToPipeline();
-        }
-
         return true;
     }
 
     void EditorApplication::ShutdownGame()
     {
-        Editor::Instance()->SetViewportTexture(nullptr);
-
-        if (m_Game)
+        if (Application::Instance())
         {
-            if (m_DestroyFunc)
-                m_DestroyFunc(m_Game);
-            if (m_DestroyApp)
-                m_DestroyApp(m_Game);
-            m_Game = nullptr;
+            Editor::Instance()->SetViewportTexture(nullptr);
+            Application::Instance()->Destroy();
         }
-
-        Render::Instance()->SetEditorMode(false);
     }
 
     Window* EditorApplication::GetWindow()

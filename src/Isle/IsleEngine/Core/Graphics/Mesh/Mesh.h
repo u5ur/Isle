@@ -1,6 +1,7 @@
 #pragma once
 #include <Core/Common/Common.h>
 #include <Core/Graphics/Material/Material.h>
+#include <Core/Graphics/Structs/GpuStructs.h>
 
 namespace Isle
 {
@@ -14,8 +15,11 @@ namespace Isle
         bool m_UseViewModel = false;
         std::vector<GpuVertex> m_Vertices;
         std::vector<unsigned int> m_Indices;
+        bool m_Dirty = true;
 
     public:
+        Mesh();
+
         bool GetUseViewModel();
         void SetUseViewModel(bool value);
 
@@ -24,8 +28,11 @@ namespace Isle
 
         void SetVertices(std::vector<GpuVertex> vertices);
         void SetIndices(std::vector<unsigned int> indices);
-
         std::vector<GpuVertex> GetVertices();
         std::vector<unsigned int> GetIndices();
+
+        bool IsDirty();
+        void MarkDirty(bool value = true);
+
     };
 }

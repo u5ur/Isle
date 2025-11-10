@@ -14,3 +14,5 @@
 #include <Core/AssetManager/AssetManager.h>
 #include <Core/Camera/EditorCamera.h>
 #include <Core/Camera/OrthographicCamera.h>
+#include <Core/Engine/Engine.h>
+#include <Core/Application/Application.h>

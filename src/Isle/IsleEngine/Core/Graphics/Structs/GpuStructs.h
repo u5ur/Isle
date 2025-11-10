@@ -7,39 +7,62 @@ namespace Isle
     struct alignas(16) GpuVertex
     {
         glm::vec3 m_Position;
-        float _pad0;
-        glm::vec3 m_Normal;
-        float _pad1;
+        uint32_t  m_NormalTangent;
         glm::vec2 m_TexCoord;
-        glm::vec2 _pad2;
-        glm::vec3 m_Tangent;
-        float _pad3;
-        glm::vec3 m_BitTangent;
-        float _pad4;
-        glm::vec4 m_Color;
+        uint32_t  m_Color;
 
         GpuVertex() = default;
+
         GpuVertex(
             const glm::vec3& position,
             const glm::vec3& normal,
-            const glm::vec2& texCoord,
             const glm::vec3& tangent,
-            const glm::vec3& bitTangent,
+            const glm::vec2& texCoord,
             const glm::vec4& color)
-            : m_Position(position),
-            _pad0(0.0f),
-            m_Normal(normal),
-            _pad1(0.0f),
-            m_TexCoord(texCoord),
-            _pad2(0.0f),
-            m_Tangent(tangent),
-            _pad3(0.0f),
-            m_BitTangent(bitTangent),
-            _pad4(0.0f),
-            m_Color(color)
+            : m_Position(position)
+            , m_TexCoord(texCoord)
         {
+            m_NormalTangent = PackNormalTangent(normal, tangent);
+            m_Color = PackColor(color);
+        }
+
+        static uint32_t PackNormalTangent(const glm::vec3& n, const glm::vec3& t)
+        {
+            glm::vec3 normal = glm::normalize(n);
+            glm::vec3 tangentDir = glm::normalize(t);
+
+            auto to10bit = [](float v) -> int32_t {
+                return static_cast<int32_t>(glm::clamp(v, -1.0f, 1.0f) * 511.0f);
+                };
+
+            int32_t nx = to10bit(normal.x);
+            int32_t ny = to10bit(normal.y);
+            int32_t nz = to10bit(normal.z);
+            int32_t tx = to10bit(tangentDir.x);
+
+            uint32_t packed = ((nx & 0x3FF) |
+                ((ny & 0x3FF) << 10) |
+                ((nz & 0x3FF) << 20) |
+                ((tx < 0 ? 1u : 0u) << 30));
+
+            return packed;
+        }
+
+        static uint32_t PackColor(const glm::vec4& color)
+        {
+            auto to8bit = [](float v) -> uint8_t {
+                return static_cast<uint8_t>(glm::clamp(v, 0.0f, 1.0f) * 255.0f);
+                };
+
+            uint8_t r = to8bit(color.r);
+            uint8_t g = to8bit(color.g);
+            uint8_t b = to8bit(color.b);
+            uint8_t a = to8bit(color.a);
+
+            return (a << 24) | (b << 16) | (g << 8) | (r);
         }
     };
+
 
     struct alignas(16) GpuSkinnedVertex
     {

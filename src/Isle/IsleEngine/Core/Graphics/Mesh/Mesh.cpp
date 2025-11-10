@@ -2,6 +2,10 @@
 
 namespace Isle
 {
+    Mesh::Mesh()
+    {
+    }
+
     bool Mesh::GetUseViewModel()
     {
         return m_UseViewModel;
@@ -19,7 +23,10 @@ namespace Isle
 
     void Mesh::SetMaterial(Material* material)
     {
-        m_Material = Ref<Material>(material);
+        if (m_Material.Get() != material)
+        {
+            m_Material = Ref<Material>(material);
+        }
     }
 
     std::vector<GpuVertex> Mesh::GetVertices()
@@ -34,11 +41,24 @@ namespace Isle
 
     void Mesh::SetVertices(std::vector<GpuVertex> vertices)
     {
-        m_Vertices = vertices;
+        m_Vertices = std::move(vertices);
+        MarkDirty();
     }
 
     void Mesh::SetIndices(std::vector<unsigned int> indices)
     {
-        m_Indices = indices;
+        m_Indices = std::move(indices);
+        MarkDirty();
+    }
+
+    bool Mesh::IsDirty()
+    {
+        return m_Dirty || IsTransformDirty();
+    }
+
+    void Mesh::MarkDirty(bool value)
+    {
+        m_Dirty = value;
+        m_TransformDirty = value;
     }
 }

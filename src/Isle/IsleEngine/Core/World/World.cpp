@@ -4,9 +4,11 @@ namespace Isle
 {
 	void World::Start()
 	{
+		SetName("World");
 		if (GetChildren<DirectionalLight>().empty())
 		{
 			auto* dirLight = new DirectionalLight();
+			dirLight->SetName("Directional Light");
 			AddChild(dirLight);
 		}
 	}

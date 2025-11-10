@@ -32,7 +32,6 @@ namespace Isle
         Ref<GfxBuffer> m_TextureBuffer;
         Ref<GfxBuffer> m_DummyVAO;
 
-        ForwardPass* m_ForwardPass;
         GeometryPass* m_GeometryPass;
         LightingPass* m_LightingPass;
         ShadowPass* m_ShadowPass;

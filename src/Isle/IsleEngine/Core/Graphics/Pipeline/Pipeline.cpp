@@ -20,9 +20,6 @@ namespace Isle
         m_DummyVAO = New<GfxBuffer>(GFX_BUFFER_TYPE::VERTEX, 0);
         m_DummyVAO->SetIndexBuffer(m_IndexBuffer.Get());
 
-        m_ForwardPass = new ForwardPass();
-        m_ForwardPass->Start();
-
         m_GeometryPass = new GeometryPass();
         m_GeometryPass->Start();
 
@@ -175,7 +172,6 @@ namespace Isle
 
     void Pipeline::Destroy()
     {
-        delete m_ForwardPass;
         delete m_GeometryPass;
         delete m_LightingPass;
         delete m_ShadowPass;
@@ -195,6 +191,7 @@ namespace Isle
         m_TextureToIndex.clear();
         m_MaterialToIndex.clear();
     }
+
 
     void Pipeline::Draw()
     {
@@ -218,12 +215,24 @@ namespace Isle
         m_DummyVAO->Bind();
         m_DrawCommandBuffer->Bind();
 
-        std::vector<GpuStaticMesh> staticMeshes = m_StaticMeshBuffer->GetData<GpuStaticMesh>();
-        std::vector<GpuDrawCommand> drawCommands = m_DrawCommandBuffer->GetData<GpuDrawCommand>();
+        const GpuStaticMesh* staticMeshes = m_StaticMeshBuffer->GetDataPtr<GpuStaticMesh>();
+        const size_t staticMeshCount = m_StaticMeshBuffer->GetDataCount<GpuStaticMesh>();
 
-        for (size_t i = 0; i < drawCommands.size(); i++)
+        const GpuDrawCommand* drawCommands = m_DrawCommandBuffer->GetDataPtr<GpuDrawCommand>();
+        const size_t drawCommandCount = m_DrawCommandBuffer->GetDataCount<GpuDrawCommand>();
+
+        if (!staticMeshes || !drawCommands)
         {
-            uint32_t baseInstance = drawCommands[i].m_BaseInstance;
+            m_DrawCommandBuffer->Unbind();
+            m_DummyVAO->Unbind();
+            return;
+        }
+
+        for (size_t i = 0; i < drawCommandCount; i++)
+        {
+            const uint32_t baseInstance = drawCommands[i].m_BaseInstance;
+            if (baseInstance >= staticMeshCount)
+                continue;
 
             if (staticMeshes[baseInstance].m_Selected)
             {
@@ -243,6 +252,7 @@ namespace Isle
         m_DrawCommandBuffer->Unbind();
         m_DummyVAO->Unbind();
     }
+
 
     Ref<Texture> Pipeline::GetFinalOutput()
     {
@@ -313,92 +323,90 @@ namespace Isle
 
     void Pipeline::UpdateLight(Light* light)
     {
-        if (!light)
+        if (!light || light->m_Id == -1)
             return;
 
-        if (light->m_Id == -1)
-            return;
+        GpuLight* lights = m_LightBuffer->GetDataPtr<GpuLight>();
+        const size_t lightCount = m_LightBuffer->GetDataCount<GpuLight>();
 
-        auto currentData = m_LightBuffer->GetData<GpuLight>();
-        if (light->m_Id >= currentData.size())
+        if (!lights || light->m_Id >= lightCount)
             return;
 
         GpuLight gpuLight{};
+
         if (auto dirLight = dynamic_cast<DirectionalLight*>(light))
-        {
             gpuLight = dirLight->ToGpuLight();
-        }
         else if (auto pointLight = dynamic_cast<PointLight*>(light))
-        {
             gpuLight = pointLight->ToGpuLight();
-        }
         else if (auto spotLight = dynamic_cast<SpotLight*>(light))
-        {
             gpuLight = spotLight->ToGpuLight();
-        }
         else
-        {
             gpuLight = light->ToGpuLight();
-        }
 
-        size_t offsetInBytes = light->m_Id * sizeof(GpuLight);
-        auto bufferData = m_LightBuffer->GetData<uint8_t>();
-
-        if (offsetInBytes + sizeof(GpuLight) <= bufferData.size())
-        {
-            std::memcpy(
-                bufferData.data() + offsetInBytes,
-                &gpuLight,
-                sizeof(GpuLight)
-            );
-
-            m_LightBuffer->SetData(bufferData);
-        }
+        lights[light->m_Id] = gpuLight;
+        m_LightBuffer->MarkDirty();
     }
-
 
     void Pipeline::AddMaterial(Material* material)
     {
+        if (!material)
+            return;
+
         m_MaterialBuffer->Add<GpuMaterial>(material->GetGpuMaterial());
     }
 
+
     void Pipeline::UpdateStaticMesh(StaticMesh* mesh)
     {
+        if (!mesh)
+            return;
+
         if (mesh->m_Id == -1)
             return;
 
-        auto currentData = m_StaticMeshBuffer->GetData<GpuStaticMesh>();
-        if (mesh->m_Id >= currentData.size())
+        const GpuStaticMesh* staticMeshes = m_StaticMeshBuffer->GetDataPtr<GpuStaticMesh>();
+        const size_t meshCount = m_StaticMeshBuffer->GetDataCount<GpuStaticMesh>();
+
+        if (mesh->m_Id >= meshCount)
             return;
 
-        bool wasSelected = currentData[mesh->m_Id].m_Selected;
+        bool wasSelected = staticMeshes[mesh->m_Id].m_Selected;
 
         GpuStaticMesh gpuMesh = mesh->GetGpuStaticMesh();
         gpuMesh.m_Selected = wasSelected;
 
         if (mesh->GetMaterial())
         {
-            UpdateMaterial(mesh->GetMaterial());
-
             auto it = m_MaterialToIndex.find(mesh->GetMaterial());
             if (it != m_MaterialToIndex.end())
-            {
                 gpuMesh.m_MaterialIndex = it->second;
-            }
+            else
+                gpuMesh.m_MaterialIndex = -1;
         }
 
-        size_t offsetInBytes = mesh->m_Id * sizeof(GpuStaticMesh);
-        auto bufferData = m_StaticMeshBuffer->GetData<uint8_t>();
-
-        if (offsetInBytes + sizeof(GpuStaticMesh) <= bufferData.size())
+        if (mesh->GetMaterial() && mesh->GetMaterial()->IsDirty())
         {
-            std::memcpy(
-                bufferData.data() + offsetInBytes,
-                &gpuMesh,
-                sizeof(GpuStaticMesh)
-            );
+            UpdateMaterial(mesh->GetMaterial());
+            mesh->GetMaterial()->MarkDirty(false);
+        }
 
-            m_StaticMeshBuffer->SetData(bufferData);
+        if (mesh->IsDirty())
+        {
+            const size_t offsetInBytes = mesh->m_Id * sizeof(GpuStaticMesh);
+            const size_t totalBytes = m_StaticMeshBuffer->GetSize();
+
+            if (offsetInBytes + sizeof(GpuStaticMesh) <= totalBytes)
+            {
+                std::memcpy(
+                    m_StaticMeshBuffer->GetDataPtr<uint8_t>() + offsetInBytes,
+                    &gpuMesh,
+                    sizeof(GpuStaticMesh)
+                );
+
+                m_StaticMeshBuffer->MarkDirty();
+            }
+
+            mesh->MarkDirty(false);
         }
     }
 
@@ -411,22 +419,24 @@ namespace Isle
         if (it == m_MaterialToIndex.end())
             return;
 
-        uint32_t materialIndex = it->second;
-        GpuMaterial gpuMaterial = material->GetGpuMaterial();
-        size_t offsetInBytes = materialIndex * sizeof(GpuMaterial);
-        auto bufferData = m_MaterialBuffer->GetData<uint8_t>();
+        const uint32_t materialIndex = it->second;
+        const size_t offsetInBytes = materialIndex * sizeof(GpuMaterial);
+        const size_t totalBytes = m_MaterialBuffer->GetSize();
 
-        if (offsetInBytes + sizeof(GpuMaterial) <= bufferData.size())
-        {
-            std::memcpy(
-                bufferData.data() + offsetInBytes,
-                &gpuMaterial,
-                sizeof(GpuMaterial)
-            );
+        if (offsetInBytes + sizeof(GpuMaterial) > totalBytes)
+            return;
 
-            m_MaterialBuffer->SetData(bufferData);
-        }
+        const GpuMaterial gpuMaterial = material->GetGpuMaterial();
+
+        std::memcpy(
+            m_MaterialBuffer->GetDataPtr<uint8_t>() + offsetInBytes,
+            &gpuMaterial,
+            sizeof(GpuMaterial)
+        );
+
+        m_MaterialBuffer->MarkDirty();
     }
+
 
     void Pipeline::AddMaterialTexture(Material* material, std::string name)
     {
@@ -456,8 +466,16 @@ namespace Isle
         if (!camera)
             return;
 
-        m_CameraBuffer->SetData<GpuCamera>({ camera->GetCpuCamera() });
+        const GpuCamera gpuCamera = camera->GetCpuCamera();
+
+        GpuCamera* camPtr = m_CameraBuffer->GetDataPtr<GpuCamera>();
+        if (!camPtr)
+            return;
+
+        *camPtr = gpuCamera;
+        m_CameraBuffer->MarkDirty();
     }
+
 
     void Pipeline::AddLight(Light* light)
     {
@@ -473,24 +491,21 @@ namespace Isle
         if (!selectedMesh || selectedMesh->m_Id < 0)
             return;
 
-        std::vector<GpuStaticMesh> currentData = m_StaticMeshBuffer->GetData<GpuStaticMesh>();
+        GpuStaticMesh* staticMeshes = m_StaticMeshBuffer->GetDataPtr<GpuStaticMesh>();
+        const size_t staticMeshCount = m_StaticMeshBuffer->GetDataCount<GpuStaticMesh>();
 
-        if (selectedMesh->m_Id >= currentData.size())
-        {
+        if (!staticMeshes || selectedMesh->m_Id >= staticMeshCount)
             return;
-        }
-        for (auto& mesh : currentData)
-        {
-            mesh.m_Selected = 0;
-        }
+
+        for (size_t i = 0; i < staticMeshCount; i++)
+            staticMeshes[i].m_Selected = 0;
 
         if (state)
-        {
-            currentData[selectedMesh->m_Id].m_Selected = 1;
-        }
+            staticMeshes[selectedMesh->m_Id].m_Selected = 1;
 
-        m_StaticMeshBuffer->SetData(currentData);
+        m_StaticMeshBuffer->MarkDirty();
     }
+
 
 
     Ref<GfxBuffer> Pipeline::GetStaticMeshBuffer()

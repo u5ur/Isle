@@ -93,20 +93,15 @@ namespace Isle
         void  Unmap();
 
         template<typename T>
-        void SetData(const std::vector<T>& data)
+        T* GetDataPtr()
         {
-            m_LocalData.resize(data.size() * sizeof(T));
-            std::memcpy(m_LocalData.data(), data.data(), m_LocalData.size());
-            m_Dirty = true;
-            m_SizeInBytes = m_LocalData.size();
+            return reinterpret_cast<T*>(m_LocalData.data());
         }
 
         template<typename T>
-        std::vector<T> GetData() const
+        size_t GetDataCount() const
         {
-            std::vector<T> out(m_LocalData.size() / sizeof(T));
-            std::memcpy(out.data(), m_LocalData.data(), m_LocalData.size());
-            return out;
+            return m_LocalData.size() / sizeof(T);
         }
 
         template<typename T>
@@ -161,6 +156,7 @@ namespace Isle
         static GLenum ResolveTarget(GFX_BUFFER_TYPE type);
         static GLenum ResolveUsage(GFX_BUFFER_USAGE usage);
 
+        void MarkDirty() { m_Dirty = true; }
         bool IsDirty() const { return m_Dirty; }
         GLsizeiptr GetSize() const { return static_cast<GLsizeiptr>(m_LocalData.size()); }
         GLuint GetId() const { return m_Id; }

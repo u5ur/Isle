@@ -3,33 +3,9 @@
 struct GpuVertex
 {
     vec3 m_Position;
-    float _pad0;
-    vec3 m_Normal;
-    float _pad1;
+    uint m_NormalTangent;
     vec2 m_TexCoord;
-    vec2 _pad2;
-    vec3 m_Tangent;
-    float _pad3;
-    vec3 m_BitTangent;
-    float _pad4;
-    vec4 m_Color;
-};
-
-struct GpuSkinnedVertex
-{
-    vec3 m_Position;
-    float _pad0;
-    vec3 m_Normal;
-    float _pad1;
-    vec2 m_TexCoord;
-    vec2 _pad2;
-    vec3 m_Tangent;
-    float _pad3;
-    vec3 m_BitTangent;
-    float _pad4;
-    vec4 m_Color;
-    ivec4 m_BoneIds;
-    vec4 m_BoneWeights;
+    uint m_Color;
 };
 
 struct GpuMaterial
@@ -69,24 +45,6 @@ struct GpuStaticMesh
     int _pad1;
 };
 
-struct GpuSkinnedMesh
-{
-    mat4 m_Transform;
-    mat4 m_NormalMatrix;
-    vec3 m_AABBMin;
-    float _pad0;
-    vec3 m_AABBMax;
-    int m_Selected;
-    uint32_t m_VertexOffset;
-    uint32_t m_IndexOffset;
-    uint32_t m_IndexCount;
-    uint32_t m_MaterialIndex;
-    uint32_t m_BoneMatrixOffset;
-    uint32_t m_BoneCount;
-    uint32_t m_UseViewModel;
-    int _pad1;
-};
-
 struct GpuCamera
 {
     mat4 m_ViewMatrix;
@@ -109,24 +67,64 @@ struct GpuLight
     mat4 m_ShadowMatrices[6];
 };
 
-struct GpuDrawCommand
+struct UnpackedVertex
 {
-    int m_Count;
-    int m_InstanceCount;
-    int m_FirstIndex;
-    int m_BaseVertex;
-    int m_BaseInstance;
-    int _pad0[3];
+    vec3 position;
+    vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    vec2 texCoord;
+    vec4 color;
 };
 
-struct GpuVoxelGrid
+float unpack10BitSNorm(int p)
 {
-    vec3 m_GridMin;
-    float _pad0;
-    vec3 m_GridMax;
-    float _pad1;
-    vec3 m_CellSize;
-    float _pad2;
-    ivec3 m_Resolution;
-    int m_MipCount;
-};
+    int value = (p >= 512) ? (p - 1024) : p;
+    return clamp(float(value) / 511.0, -1.0, 1.0);
+}
+
+vec4 unpackNormalTangent(uint p)
+{
+    int nx = int(p & 0x3FFu);
+    int ny = int((p >> 10u) & 0x3FFu);
+    int nz = int((p >> 20u) & 0x3FFu);
+    uint handedness = (p >> 30u) & 0x3u;
+
+    vec3 normal = vec3(
+        unpack10BitSNorm(nx),
+        unpack10BitSNorm(ny),
+        unpack10BitSNorm(nz)
+    );
+    normal = normalize(normal);
+
+    float tangentW = (handedness > 0u) ? 1.0 : -1.0;
+    return vec4(normal, tangentW);
+}
+
+vec4 unpackColor(uint p)
+{
+    return vec4(
+        float(p & 0xFFu) / 255.0,
+        float((p >> 8u) & 0xFFu) / 255.0,
+        float((p >> 16u) & 0xFFu) / 255.0,
+        float((p >> 24u) & 0xFFu) / 255.0
+    );
+}
+
+UnpackedVertex unpackVertex(GpuVertex vertex)
+{
+    UnpackedVertex unpacked;
+    unpacked.position = vertex.m_Position;
+    unpacked.texCoord = vertex.m_TexCoord;
+    unpacked.color = unpackColor(vertex.m_Color);
+    
+    vec4 normalTangentW = unpackNormalTangent(vertex.m_NormalTangent);
+    unpacked.normal = normalTangentW.xyz;
+    float tangentW = normalTangentW.w;
+    
+    vec3 helper = (abs(unpacked.normal.x) > 0.999) ? vec3(0, 1, 0) : vec3(1, 0, 0);
+    unpacked.tangent = normalize(cross(unpacked.normal, helper));
+    unpacked.bitangent = cross(unpacked.normal, unpacked.tangent) * tangentW;
+    
+    return unpacked;
+}

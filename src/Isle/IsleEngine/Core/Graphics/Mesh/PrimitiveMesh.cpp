@@ -12,42 +12,48 @@ namespace Isle
     CubeMesh::CubeMesh()
     {
         Build();
-        m_Material = New<Material>(); // CHANGED: Use New<> helper
+        m_Material = New<Material>();
+        SetName("Cube");
     }
 
     void CubeMesh::Build()
     {
+        auto makeVertex = [this](const glm::vec3& pos, const glm::vec3& normal,
+            const glm::vec2& uv, const glm::vec3& tangent) {
+                return GpuVertex(pos, normal, tangent, uv, m_Color);
+            };
+
         std::vector<Isle::GpuVertex> Vertices =
         {
-            {{-0.5f,-0.5f, 0.5f}, {0,0,1}, {0,0}, {1,0,0}, {0,1,0}, m_Color},
-            {{ 0.5f,-0.5f, 0.5f}, {0,0,1}, {1,0}, {1,0,0}, {0,1,0}, m_Color},
-            {{ 0.5f, 0.5f, 0.5f}, {0,0,1}, {1,1}, {1,0,0}, {0,1,0}, m_Color},
-            {{-0.5f, 0.5f, 0.5f}, {0,0,1}, {0,1}, {1,0,0}, {0,1,0}, m_Color},
+            makeVertex({-0.5f,-0.5f, 0.5f}, {0,0,1}, {0,0}, {1,0,0}),
+            makeVertex({ 0.5f,-0.5f, 0.5f}, {0,0,1}, {1,0}, {1,0,0}),
+            makeVertex({ 0.5f, 0.5f, 0.5f}, {0,0,1}, {1,1}, {1,0,0}),
+            makeVertex({-0.5f, 0.5f, 0.5f}, {0,0,1}, {0,1}, {1,0,0}),
 
-            {{ 0.5f,-0.5f,-0.5f}, {0,0,-1}, {0,0}, {-1,0,0}, {0,1,0}, m_Color},
-            {{-0.5f,-0.5f,-0.5f}, {0,0,-1}, {1,0}, {-1,0,0}, {0,1,0}, m_Color},
-            {{-0.5f, 0.5f,-0.5f}, {0,0,-1}, {1,1}, {-1,0,0}, {0,1,0}, m_Color},
-            {{ 0.5f, 0.5f,-0.5f}, {0,0,-1}, {0,1}, {-1,0,0}, {0,1,0}, m_Color},
+            makeVertex({ 0.5f,-0.5f,-0.5f}, {0,0,-1}, {0,0}, {-1,0,0}),
+            makeVertex({-0.5f,-0.5f,-0.5f}, {0,0,-1}, {1,0}, {-1,0,0}),
+            makeVertex({-0.5f, 0.5f,-0.5f}, {0,0,-1}, {1,1}, {-1,0,0}),
+            makeVertex({ 0.5f, 0.5f,-0.5f}, {0,0,-1}, {0,1}, {-1,0,0}),
 
-            {{-0.5f, 0.5f, 0.5f}, {0,1,0}, {0,0}, {1,0,0}, {0,0,-1}, m_Color},
-            {{ 0.5f, 0.5f, 0.5f}, {0,1,0}, {1,0}, {1,0,0}, {0,0,-1}, m_Color},
-            {{ 0.5f, 0.5f,-0.5f}, {0,1,0}, {1,1}, {1,0,0}, {0,0,-1}, m_Color},
-            {{-0.5f, 0.5f,-0.5f}, {0,1,0}, {0,1}, {1,0,0}, {0,0,-1}, m_Color},
+            makeVertex({-0.5f, 0.5f, 0.5f}, {0,1,0}, {0,0}, {1,0,0}),
+            makeVertex({ 0.5f, 0.5f, 0.5f}, {0,1,0}, {1,0}, {1,0,0}),
+            makeVertex({ 0.5f, 0.5f,-0.5f}, {0,1,0}, {1,1}, {1,0,0}),
+            makeVertex({-0.5f, 0.5f,-0.5f}, {0,1,0}, {0,1}, {1,0,0}),
 
-            {{-0.5f,-0.5f,-0.5f}, {0,-1,0}, {0,0}, {1,0,0}, {0,0,1}, m_Color},
-            {{ 0.5f,-0.5f,-0.5f}, {0,-1,0}, {1,0}, {1,0,0}, {0,0,1}, m_Color},
-            {{ 0.5f,-0.5f, 0.5f}, {0,-1,0}, {1,1}, {1,0,0}, {0,0,1}, m_Color},
-            {{-0.5f,-0.5f, 0.5f}, {0,-1,0}, {0,1}, {1,0,0}, {0,0,1}, m_Color},
+            makeVertex({-0.5f,-0.5f,-0.5f}, {0,-1,0}, {0,0}, {1,0,0}),
+            makeVertex({ 0.5f,-0.5f,-0.5f}, {0,-1,0}, {1,0}, {1,0,0}),
+            makeVertex({ 0.5f,-0.5f, 0.5f}, {0,-1,0}, {1,1}, {1,0,0}),
+            makeVertex({-0.5f,-0.5f, 0.5f}, {0,-1,0}, {0,1}, {1,0,0}),
 
-            {{ 0.5f,-0.5f, 0.5f}, {1,0,0}, {0,0}, {0,1,0}, {0,0,-1}, m_Color},
-            {{ 0.5f,-0.5f,-0.5f}, {1,0,0}, {1,0}, {0,1,0}, {0,0,-1}, m_Color},
-            {{ 0.5f, 0.5f,-0.5f}, {1,0,0}, {1,1}, {0,1,0}, {0,0,-1}, m_Color},
-            {{ 0.5f, 0.5f, 0.5f}, {1,0,0}, {0,1}, {0,1,0}, {0,0,-1}, m_Color},
+            makeVertex({ 0.5f,-0.5f, 0.5f}, {1,0,0}, {0,0}, {0,1,0}),
+            makeVertex({ 0.5f,-0.5f,-0.5f}, {1,0,0}, {1,0}, {0,1,0}),
+            makeVertex({ 0.5f, 0.5f,-0.5f}, {1,0,0}, {1,1}, {0,1,0}),
+            makeVertex({ 0.5f, 0.5f, 0.5f}, {1,0,0}, {0,1}, {0,1,0}),
 
-            {{-0.5f,-0.5f,-0.5f}, {-1,0,0}, {0,0}, {0,1,0}, {0,0,1}, m_Color},
-            {{-0.5f,-0.5f, 0.5f}, {-1,0,0}, {1,0}, {0,1,0}, {0,0,1}, m_Color},
-            {{-0.5f, 0.5f, 0.5f}, {-1,0,0}, {1,1}, {0,1,0}, {0,0,1}, m_Color},
-            {{-0.5f, 0.5f,-0.5f}, {-1,0,0}, {0,1}, {0,1,0}, {0,0,1}, m_Color}
+            makeVertex({-0.5f,-0.5f,-0.5f}, {-1,0,0}, {0,0}, {0,1,0}),
+            makeVertex({-0.5f,-0.5f, 0.5f}, {-1,0,0}, {1,0}, {0,1,0}),
+            makeVertex({-0.5f, 0.5f, 0.5f}, {-1,0,0}, {1,1}, {0,1,0}),
+            makeVertex({-0.5f, 0.5f,-0.5f}, {-1,0,0}, {0,1}, {0,1,0})
         };
 
         std::vector<unsigned int> Indices =
@@ -75,17 +81,22 @@ namespace Isle
     PlaneMesh::PlaneMesh()
     {
         Build();
-        m_Material = New<Material>(); // CHANGED
+        m_Material = New<Material>();
     }
 
     void PlaneMesh::Build()
     {
+        auto makeVertex = [this](const glm::vec3& pos, const glm::vec3& normal,
+            const glm::vec2& uv, const glm::vec3& tangent) {
+                return GpuVertex(pos, normal, tangent, uv, m_Color);
+            };
+
         std::vector<Isle::GpuVertex> Vertices =
         {
-            {{-0.5f, 0.0f,  0.5f}, {0,1,0}, {0,0}, {1,0,0}, {0,0,1}, m_Color},
-            {{ 0.5f, 0.0f,  0.5f}, {0,1,0}, {1,0}, {1,0,0}, {0,0,1}, m_Color},
-            {{ 0.5f, 0.0f, -0.5f}, {0,1,0}, {1,1}, {1,0,0}, {0,0,1}, m_Color},
-            {{-0.5f, 0.0f, -0.5f}, {0,1,0}, {0,1}, {1,0,0}, {0,0,1}, m_Color}
+            makeVertex({-0.5f, 0.0f,  0.5f}, {0,1,0}, {0,0}, {1,0,0}),
+            makeVertex({ 0.5f, 0.0f,  0.5f}, {0,1,0}, {1,0}, {1,0,0}),
+            makeVertex({ 0.5f, 0.0f, -0.5f}, {0,1,0}, {1,1}, {1,0,0}),
+            makeVertex({-0.5f, 0.0f, -0.5f}, {0,1,0}, {0,1}, {1,0,0})
         };
 
         std::vector<unsigned int> Indices = { 0, 1, 2, 2, 3, 0 };
@@ -105,7 +116,7 @@ namespace Isle
     SphereMesh::SphereMesh()
     {
         Build();
-        m_Material = New<Material>(); // CHANGED
+        m_Material = New<Material>();
     }
 
     void SphereMesh::Build()
@@ -129,18 +140,21 @@ namespace Isle
                 float sinPhi = std::sin(phi);
                 float cosPhi = std::cos(phi);
 
-                Isle::GpuVertex vertex;
-                vertex.m_Position.x = radius * sinTheta * cosPhi;
-                vertex.m_Position.y = radius * cosTheta;
-                vertex.m_Position.z = radius * sinTheta * sinPhi;
-                vertex.m_Normal = glm::normalize(vertex.m_Position);
-                vertex.m_TexCoord.x = 1.0f - (float)segment / segments;
-                vertex.m_TexCoord.y = 1.0f - (float)ring / rings;
-                vertex.m_Tangent = glm::normalize(glm::vec3(
+                glm::vec3 position;
+                position.x = radius * sinTheta * cosPhi;
+                position.y = radius * cosTheta;
+                position.z = radius * sinTheta * sinPhi;
+
+                glm::vec3 normal = glm::normalize(position);
+
+                glm::vec2 texCoord;
+                texCoord.x = 1.0f - (float)segment / segments;
+                texCoord.y = 1.0f - (float)ring / rings;
+
+                glm::vec3 tangent = glm::normalize(glm::vec3(
                     -radius * sinTheta * sinPhi, 0.0f, radius * sinTheta * cosPhi));
-                vertex.m_BitTangent = glm::normalize(glm::cross(vertex.m_Normal, vertex.m_Tangent));
-                vertex.m_Color = m_Color;
-                Vertices.push_back(vertex);
+
+                Vertices.emplace_back(position, normal, tangent, texCoord, m_Color);
             }
         }
 
