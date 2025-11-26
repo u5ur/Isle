@@ -142,3 +142,4 @@ inline bool HasAnsiSupport()
     } while (0)
 
 #include "Reflection/Reflection.h"
+#include "Profiler/Profiler.h"

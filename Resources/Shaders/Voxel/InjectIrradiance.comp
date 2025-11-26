@@ -1,0 +1,43 @@
+#version 460 core
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout(binding = 0, rgba16f) uniform readonly image3D u_VoxelRadiance;
+layout(binding = 1, rgba16f) uniform readonly image3D u_VoxelNormal;
+layout(binding = 2, rgba16f) uniform readonly image3D u_IrradiancePrev;
+layout(binding = 3, rgba16f) uniform writeonly image3D u_IrradianceOut;
+
+uniform ivec3 u_Resolution;
+uniform int u_Frame;
+
+// In InjectIrradiance.comp - REPLACE the main function:
+void main()
+{
+    ivec3 voxelCoord = ivec3(gl_GlobalInvocationID);
+    
+    if (any(greaterThanEqual(voxelCoord, u_Resolution)))
+        return;
+    
+    vec4 currentRadiance = imageLoad(u_VoxelRadiance, voxelCoord);
+    vec4 prevIrradiance = imageLoad(u_IrradiancePrev, voxelCoord);
+    
+    if (currentRadiance.a < 0.01)
+    {
+        imageStore(u_IrradianceOut, voxelCoord, vec4(prevIrradiance.rgb * 0.98, prevIrradiance.a * 0.98));
+        return;
+    }
+    
+    float blendFactor = 0.3;
+    if (prevIrradiance.a > 0.0)
+    {
+        float adaptiveBlend = prevIrradiance.a / (prevIrradiance.a + 2.0);
+        blendFactor = max(blendFactor, adaptiveBlend);
+        blendFactor = clamp(blendFactor, 0.3, 0.8);
+    }
+    
+    vec3 newIrradiance = mix(currentRadiance.rgb, prevIrradiance.rgb, blendFactor);
+    
+    float newSampleCount = prevIrradiance.a + 0.5;
+    
+    imageStore(u_IrradianceOut, voxelCoord, vec4(newIrradiance, newSampleCount));
+}

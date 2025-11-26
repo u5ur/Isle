@@ -60,6 +60,13 @@ namespace Isle
         m_CameraBuffer->Bind(5);
         m_TextureBuffer->Bind(6);
 
+        if (m_ShadowPass)
+        {
+            m_ShadowPass->Bind();
+            Draw();
+            m_ShadowPass->Unbind();
+        }
+
         if (m_VoxelPass)
         {
             m_VoxelPass->Bind();
@@ -73,15 +80,17 @@ namespace Isle
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             m_VoxelPass->BuildVoxels();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            m_VoxelPass->InjectDirectLighting();
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            m_VoxelPass->PropagateIrradiance();
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
             m_VoxelPass->GenerateMipmaps();
             glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-        }
 
-        if (m_ShadowPass)
-        {
-            m_ShadowPass->Bind();
-            Draw();
-            m_ShadowPass->Unbind();
+            m_VoxelPass->m_CurrentFrame++;
         }
 
         if (m_GeometryPass)
@@ -116,6 +125,9 @@ namespace Isle
 
             m_ShadowPass->GetFrameBuffer()->GetAttachment(ATTACHMENT_TYPE::SHADOW_MAP)->Bind(11);
             m_LightingPass->GetShader()->SetInt("u_ShadowMap", 11);
+
+            m_GeometryPass->GetFrameBuffer()->GetAttachment(ATTACHMENT_TYPE::DEPTH)->Bind(12);
+            m_LightingPass->GetShader()->SetInt("u_DepthBuffer", 12);
 
             if (m_FullscreenQuad)
                 m_FullscreenQuad->Draw();
@@ -156,6 +168,9 @@ namespace Isle
 
             m_GeometryPass->GetFrameBuffer()->GetAttachment(ATTACHMENT_TYPE::DEPTH)->Bind(16);
             m_CompositePass->GetShader()->SetInt("u_DepthBuffer", 16);
+
+            m_VoxelPass->m_IrradianceCache->Bind(17);
+            m_CompositePass->GetShader()->SetInt("u_IrradianceCache", 17);
 
             m_CompositePass->m_Shader->SetIVec3("u_Resolution", m_VoxelPass->m_Resolution);
             m_CompositePass->m_Shader->SetIVec3("u_GridMin", m_VoxelPass->m_GridMin);

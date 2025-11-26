@@ -147,14 +147,13 @@ namespace Isle
 
         char statsText[512];
         snprintf(statsText, sizeof(statsText),
-            "Render CPU: %.2f ms (%.0f Hz)\n"
+            "FPS: %f\n"
             "Meshes: %u | Lights: %u\n"
             "Verts: %u | Indices: %u\n"
             "Materials: %u | Textures: %u\n"
             "Uploads: %u | Dirty Buffers: %u\n"
             "VRAM: %.2f MB | Frame#: %llu",
-            stats.RenderTimeCPU,
-            stats.RenderHz(),
+            Engine::Instance()->m_FPS,
             stats.MeshCount, stats.LightCount,
             stats.VertexCount, stats.IndexCount,
             stats.MaterialCount, stats.TextureCount,

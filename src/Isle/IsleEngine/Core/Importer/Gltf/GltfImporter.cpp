@@ -12,7 +12,6 @@ namespace Isle
 {
     tinygltf::Model m_Model;
 
-
     GltfImporter::GltfImporter()
     {
         m_RootComponent = new SceneComponent();
@@ -32,16 +31,21 @@ namespace Isle
 
     bool GltfImporter::LoadFromFile(const std::string& file_path)
     {
+        ScopedTimer totalTimer("TOTAL GLTF IMPORT");
+
         tinygltf::TinyGLTF loader;
         std::string err, warn;
 
         ExtractBasePath(file_path);
 
         bool ret = false;
-        if (file_path.substr(file_path.find_last_of(".") + 1) == "glb")
-            ret = loader.LoadBinaryFromFile(&m_Model, &err, &warn, file_path);
-        else
-            ret = loader.LoadASCIIFromFile(&m_Model, &err, &warn, file_path);
+        {
+            ScopedTimer fileLoadTimer("File Load (TinyGLTF)");
+            if (file_path.substr(file_path.find_last_of(".") + 1) == "glb")
+                ret = loader.LoadBinaryFromFile(&m_Model, &err, &warn, file_path);
+            else
+                ret = loader.LoadASCIIFromFile(&m_Model, &err, &warn, file_path);
+        }
 
         if (!warn.empty())
             ISLE_WARN("GLTF Warning: %s\n", warn);
@@ -55,22 +59,37 @@ namespace Isle
             return false;
         }
 
-        m_Textures.resize(m_Model.textures.size());
-        m_Materials.resize(m_Model.materials.size());
-        m_SceneComponents.reserve(m_Model.nodes.size());
+        {
+            ScopedTimer resizeTimer("Vector Resize/Reserve");
+            m_Textures.resize(m_Model.textures.size());
+            m_Materials.resize(m_Model.materials.size());
+            m_SceneComponents.reserve(m_Model.nodes.size());
+        }
 
         LoadTextures();
 
-        auto materialsFuture = std::async(std::launch::async, [this]() { LoadMaterials(); });
-        auto meshesFuture = std::async(std::launch::async, [this]() { LoadStaticMeshes(); });
+        std::future<void> materialsFuture;
+        std::future<void> meshesFuture;
 
-        materialsFuture.wait();
-        meshesFuture.wait();
-
-        const tinygltf::Scene& scene = m_Model.scenes[m_Model.defaultScene >= 0 ? m_Model.defaultScene : 0];
-        for (int node_index : scene.nodes)
         {
-            ProcessNode(node_index, nullptr);
+            ScopedTimer asyncTimer("Async Launch Materials+Meshes");
+            materialsFuture = std::async(std::launch::async, [this]() { LoadMaterials(); });
+            meshesFuture = std::async(std::launch::async, [this]() { LoadStaticMeshes(); });
+        }
+
+        {
+            ScopedTimer waitTimer("Wait for Materials+Meshes");
+            materialsFuture.wait();
+            meshesFuture.wait();
+        }
+
+        {
+            ScopedTimer sceneTimer("Process Scene Hierarchy");
+            const tinygltf::Scene& scene = m_Model.scenes[m_Model.defaultScene >= 0 ? m_Model.defaultScene : 0];
+            for (int node_index : scene.nodes)
+            {
+                ProcessNode(node_index, nullptr);
+            }
         }
 
         return true;
@@ -135,15 +154,8 @@ namespace Isle
                 {
                     if (primitiveIdx < m_StaticMeshes.size())
                     {
-                        StaticMesh* originalMesh = m_StaticMeshes[primitiveIdx];
-
-                        StaticMesh* instancedMesh = new StaticMesh();
-                        instancedMesh->SetVertices(originalMesh->GetVertices());
-                        instancedMesh->SetIndices(originalMesh->GetIndices());
-                        instancedMesh->SetMaterial(originalMesh->GetMaterial());
-                        instancedMesh->SetName(originalMesh->GetName());
-                        instancedMesh->SetBounds(originalMesh->GetBounds());
-                        component->AddChild(instancedMesh);
+                        StaticMesh* sharedMesh = m_StaticMeshes[primitiveIdx];
+                        component->AddChild(sharedMesh);
                     }
                 }
             }
@@ -162,169 +174,222 @@ namespace Isle
 
     void GltfImporter::LoadStaticMeshes()
     {
+        ScopedTimer totalMeshTimer("LoadStaticMeshes TOTAL");
+
         std::vector<std::vector<int>> meshPrimitives(m_Model.meshes.size());
 
         int totalPrimitives = 0;
-        for (const auto& mesh : m_Model.meshes)
         {
-            for (const auto& primitive : mesh.primitives)
+            ScopedTimer countTimer("Count Total Primitives");
+            for (const auto& mesh : m_Model.meshes)
             {
-                if (primitive.mode == TINYGLTF_MODE_TRIANGLES)
-                    totalPrimitives++;
+                for (const auto& primitive : mesh.primitives)
+                {
+                    if (primitive.mode == TINYGLTF_MODE_TRIANGLES)
+                        totalPrimitives++;
+                }
             }
         }
 
-        m_StaticMeshes.resize(totalPrimitives);
+        ISLE_LOG("Total primitives to process: %d\n", totalPrimitives);
+
+        {
+            ScopedTimer resizeTimer("Resize StaticMeshes Vector");
+            m_StaticMeshes.resize(totalPrimitives);
+        }
 
         unsigned int numThreads = std::thread::hardware_concurrency();
         if (numThreads == 0) numThreads = 4;
 
-        std::vector<std::future<void>> futures;
+        ISLE_LOG("Using %d threads for mesh loading\n", numThreads);
+
         std::atomic<int> primitiveIndex(0);
+        std::mutex meshPrimitiveMutex;
 
-        for (size_t meshIdx = 0; meshIdx < m_Model.meshes.size(); meshIdx++)
-        {
-            const tinygltf::Mesh& gltf_mesh = m_Model.meshes[meshIdx];
-
-            for (size_t primIdx = 0; primIdx < gltf_mesh.primitives.size(); primIdx++)
+        auto processPrimitives = [&]() {
+            int currentPrimIdx;
+            while ((currentPrimIdx = primitiveIndex.fetch_add(1)) < totalPrimitives)
             {
-                const tinygltf::Primitive& primitive = gltf_mesh.primitives[primIdx];
+                int primCount = 0;
 
-                if (primitive.mode != TINYGLTF_MODE_TRIANGLES)
-                    continue;
+                for (size_t meshIdx = 0; meshIdx < m_Model.meshes.size(); meshIdx++)
+                {
+                    const tinygltf::Mesh& gltf_mesh = m_Model.meshes[meshIdx];
 
-                int currentPrimIdx = primitiveIndex.fetch_add(1);
-                meshPrimitives[meshIdx].push_back(currentPrimIdx);
-
-                futures.push_back(std::async(std::launch::async, [this, &gltf_mesh, &primitive, currentPrimIdx]() {
-
-                    // Get position accessor
-                    auto posIt = primitive.attributes.find("POSITION");
-                    if (posIt == primitive.attributes.end())
-                        return;
-
-                    const tinygltf::Accessor& pos_accessor = m_Model.accessors[posIt->second];
-                    const tinygltf::BufferView& pos_view = m_Model.bufferViews[pos_accessor.bufferView];
-                    const tinygltf::Buffer& pos_buffer = m_Model.buffers[pos_view.buffer];
-                    const float* positions = reinterpret_cast<const float*>(&pos_buffer.data[pos_view.byteOffset + pos_accessor.byteOffset]);
-
-                    // Get optional attributes
-                    const float* normals = nullptr;
-                    auto normIt = primitive.attributes.find("NORMAL");
-                    if (normIt != primitive.attributes.end())
+                    for (size_t primIdx = 0; primIdx < gltf_mesh.primitives.size(); primIdx++)
                     {
-                        const tinygltf::Accessor& norm_accessor = m_Model.accessors[normIt->second];
-                        const tinygltf::BufferView& norm_view = m_Model.bufferViews[norm_accessor.bufferView];
-                        const tinygltf::Buffer& norm_buffer = m_Model.buffers[norm_view.buffer];
-                        normals = reinterpret_cast<const float*>(&norm_buffer.data[norm_view.byteOffset + norm_accessor.byteOffset]);
+                        const tinygltf::Primitive& primitive = gltf_mesh.primitives[primIdx];
+
+                        if (primitive.mode != TINYGLTF_MODE_TRIANGLES)
+                            continue;
+
+                        if (primCount == currentPrimIdx)
+                        {
+                            auto posIt = primitive.attributes.find("POSITION");
+                            if (posIt == primitive.attributes.end())
+                                goto next_primitive;
+
+                            const tinygltf::Accessor& pos_accessor = m_Model.accessors[posIt->second];
+                            const tinygltf::BufferView& pos_view = m_Model.bufferViews[pos_accessor.bufferView];
+                            const tinygltf::Buffer& pos_buffer = m_Model.buffers[pos_view.buffer];
+                            const float* positions = reinterpret_cast<const float*>(
+                                &pos_buffer.data[pos_view.byteOffset + pos_accessor.byteOffset]);
+
+                            const float* normals = nullptr;
+                            auto normIt = primitive.attributes.find("NORMAL");
+                            if (normIt != primitive.attributes.end())
+                            {
+                                const tinygltf::Accessor& norm_accessor = m_Model.accessors[normIt->second];
+                                const tinygltf::BufferView& norm_view = m_Model.bufferViews[norm_accessor.bufferView];
+                                const tinygltf::Buffer& norm_buffer = m_Model.buffers[norm_view.buffer];
+                                normals = reinterpret_cast<const float*>(
+                                    &norm_buffer.data[norm_view.byteOffset + norm_accessor.byteOffset]);
+                            }
+
+                            const float* texcoords = nullptr;
+                            auto texIt = primitive.attributes.find("TEXCOORD_0");
+                            if (texIt != primitive.attributes.end())
+                            {
+                                const tinygltf::Accessor& tex_accessor = m_Model.accessors[texIt->second];
+                                const tinygltf::BufferView& tex_view = m_Model.bufferViews[tex_accessor.bufferView];
+                                const tinygltf::Buffer& tex_buffer = m_Model.buffers[tex_view.buffer];
+                                texcoords = reinterpret_cast<const float*>(
+                                    &tex_buffer.data[tex_view.byteOffset + tex_accessor.byteOffset]);
+                            }
+
+                            const float* tangents = nullptr;
+                            auto tanIt = primitive.attributes.find("TANGENT");
+                            if (tanIt != primitive.attributes.end())
+                            {
+                                const tinygltf::Accessor& tan_accessor = m_Model.accessors[tanIt->second];
+                                const tinygltf::BufferView& tan_view = m_Model.bufferViews[tan_accessor.bufferView];
+                                const tinygltf::Buffer& tan_buffer = m_Model.buffers[tan_view.buffer];
+                                tangents = reinterpret_cast<const float*>(
+                                    &tan_buffer.data[tan_view.byteOffset + tan_accessor.byteOffset]);
+                            }
+
+                            std::vector<GpuVertex> vertices;
+                            vertices.reserve(pos_accessor.count);
+
+                            glm::vec3 minBounds(FLT_MAX);
+                            glm::vec3 maxBounds(-FLT_MAX);
+
+                            for (size_t v = 0; v < pos_accessor.count; v++)
+                            {
+                                const size_t p3 = v * 3;
+                                const size_t p2 = v * 2;
+                                const size_t p4 = v * 4;
+
+                                glm::vec3 position = glm::vec3(positions[p3], positions[p3 + 1], positions[p3 + 2]);
+                                glm::vec3 normal = normals ? glm::vec3(normals[p3], normals[p3 + 1], normals[p3 + 2])
+                                    : glm::vec3(0, 1, 0);
+                                glm::vec2 texCoord = texcoords ? glm::vec2(texcoords[p2], 1.0f - texcoords[p2 + 1])
+                                    : glm::vec2(0, 0);
+                                glm::vec3 tangent = tangents ? glm::vec3(tangents[p4], tangents[p4 + 1], tangents[p4 + 2])
+                                    : glm::vec3(1, 0, 0);
+                                glm::vec4 color = glm::vec4(1.0f);
+
+                                vertices.emplace_back(position, normal, tangent, texCoord, color);
+
+                                minBounds = glm::min(minBounds, position);
+                                maxBounds = glm::max(maxBounds, position);
+                            }
+
+                            const tinygltf::Accessor& idx_accessor = m_Model.accessors[primitive.indices];
+                            const tinygltf::BufferView& idx_view = m_Model.bufferViews[idx_accessor.bufferView];
+                            const tinygltf::Buffer& idx_buffer = m_Model.buffers[idx_view.buffer];
+
+                            std::vector<unsigned int> indices;
+                            indices.reserve(idx_accessor.count);
+
+                            if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+                            {
+                                const uint16_t* idx_data = reinterpret_cast<const uint16_t*>(
+                                    &idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
+                                for (size_t j = 0; j < idx_accessor.count; j++)
+                                    indices.push_back(idx_data[j]);
+                            }
+                            else if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                            {
+                                const uint32_t* idx_data = reinterpret_cast<const uint32_t*>(
+                                    &idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
+                                indices.insert(indices.end(), idx_data, idx_data + idx_accessor.count);
+                            }
+                            else if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+                            {
+                                const uint8_t* idx_data = reinterpret_cast<const uint8_t*>(
+                                    &idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
+                                for (size_t j = 0; j < idx_accessor.count; j++)
+                                    indices.push_back(idx_data[j]);
+                            }
+
+                            StaticMesh* mesh = new StaticMesh();
+                            mesh->SetVertices(std::move(vertices));
+                            mesh->SetIndices(std::move(indices));
+                            mesh->SetName(gltf_mesh.name);
+                            mesh->m_Bounds.m_Min = minBounds;
+                            mesh->m_Bounds.m_Max = maxBounds;
+
+                            if (primitive.material >= 0)
+                                mesh->SetMaterial(GetMaterial(primitive.material));
+                            else
+                                mesh->SetMaterial(new Material());
+
+                            m_StaticMeshes[currentPrimIdx] = mesh;
+
+                            {
+                                std::lock_guard<std::mutex> lock(meshPrimitiveMutex);
+                                meshPrimitives[meshIdx].push_back(currentPrimIdx);
+                            }
+
+                            goto next_primitive;
+                        }
+                        primCount++;
                     }
+                }
+            next_primitive:;
+            }
+            };
 
-                    const float* texcoords = nullptr;
-                    auto texIt = primitive.attributes.find("TEXCOORD_0");
-                    if (texIt != primitive.attributes.end())
-                    {
-                        const tinygltf::Accessor& tex_accessor = m_Model.accessors[texIt->second];
-                        const tinygltf::BufferView& tex_view = m_Model.bufferViews[tex_accessor.bufferView];
-                        const tinygltf::Buffer& tex_buffer = m_Model.buffers[tex_view.buffer];
-                        texcoords = reinterpret_cast<const float*>(&tex_buffer.data[tex_view.byteOffset + tex_accessor.byteOffset]);
-                    }
+        std::vector<std::thread> threads;
+        {
+            ScopedTimer threadTimer("Thread Creation and Execution");
+            threads.reserve(numThreads);
+            for (unsigned int i = 0; i < numThreads; i++)
+            {
+                threads.emplace_back(processPrimitives);
+            }
 
-                    const float* tangents = nullptr;
-                    auto tanIt = primitive.attributes.find("TANGENT");
-                    if (tanIt != primitive.attributes.end())
-                    {
-                        const tinygltf::Accessor& tan_accessor = m_Model.accessors[tanIt->second];
-                        const tinygltf::BufferView& tan_view = m_Model.bufferViews[tan_accessor.bufferView];
-                        const tinygltf::Buffer& tan_buffer = m_Model.buffers[tan_view.buffer];
-                        tangents = reinterpret_cast<const float*>(&tan_buffer.data[tan_view.byteOffset + tan_accessor.byteOffset]);
-                    }
-
-                    // Allocate vertices
-                    std::vector<GpuVertex> vertices(pos_accessor.count);
-
-                    glm::vec3 minBounds(FLT_MAX);
-                    glm::vec3 maxBounds(-FLT_MAX);
-
-                    // Build vertices in single pass
-                    for (size_t v = 0; v < pos_accessor.count; v++)
-                    {
-                        const size_t p3 = v * 3;
-                        const size_t p2 = v * 2;
-                        const size_t p4 = v * 4;
-
-                        glm::vec3 position = glm::vec3(positions[p3], positions[p3 + 1], positions[p3 + 2]);
-                        glm::vec3 normal = normals ? glm::vec3(normals[p3], normals[p3 + 1], normals[p3 + 2]) : glm::vec3(0, 1, 0);
-                        glm::vec2 texCoord = texcoords ? glm::vec2(texcoords[p2], 1.0f - texcoords[p2 + 1]) : glm::vec2(0, 0);
-                        glm::vec3 tangent = tangents ? glm::vec3(tangents[p4], tangents[p4 + 1], tangents[p4 + 2]) : glm::vec3(1, 0, 0);
-                        glm::vec4 color = glm::vec4(1.0f);
-
-                        // Use the packed vertex constructor
-                        vertices[v] = GpuVertex(position, normal, tangent, texCoord, color);
-
-                        minBounds = glm::min(minBounds, position);
-                        maxBounds = glm::max(maxBounds, position);
-                    }
-
-                    // Load indices
-                    const tinygltf::Accessor& idx_accessor = m_Model.accessors[primitive.indices];
-                    const tinygltf::BufferView& idx_view = m_Model.bufferViews[idx_accessor.bufferView];
-                    const tinygltf::Buffer& idx_buffer = m_Model.buffers[idx_view.buffer];
-
-                    std::vector<unsigned int> indices(idx_accessor.count);
-
-                    if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-                    {
-                        const uint16_t* idx_data = reinterpret_cast<const uint16_t*>(&idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
-                        for (size_t j = 0; j < idx_accessor.count; j++)
-                            indices[j] = idx_data[j];
-                    }
-                    else if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-                    {
-                        const uint32_t* idx_data = reinterpret_cast<const uint32_t*>(&idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
-                        memcpy(indices.data(), idx_data, idx_accessor.count * sizeof(uint32_t));
-                    }
-                    else if (idx_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-                    {
-                        const uint8_t* idx_data = reinterpret_cast<const uint8_t*>(&idx_buffer.data[idx_view.byteOffset + idx_accessor.byteOffset]);
-                        for (size_t j = 0; j < idx_accessor.count; j++)
-                            indices[j] = idx_data[j];
-                    }
-
-                    // Create mesh
-                    StaticMesh* mesh = new StaticMesh();
-                    mesh->SetVertices(std::move(vertices));
-                    mesh->SetIndices(std::move(indices));
-                    mesh->SetName(gltf_mesh.name);
-                    mesh->m_Bounds.m_Min = minBounds;
-                    mesh->m_Bounds.m_Max = maxBounds;
-
-                    if (primitive.material >= 0)
-                        mesh->SetMaterial(GetMaterial(primitive.material));
-                    else
-                        mesh->SetMaterial(new Material());
-
-                    m_StaticMeshes[currentPrimIdx] = mesh;
-                    }));
+            for (auto& thread : threads)
+            {
+                thread.join();
             }
         }
 
-        for (auto& future : futures)
         {
-            future.wait();
-        }
-
-        for (size_t i = 0; i < meshPrimitives.size(); i++)
-        {
-            if (!meshPrimitives[i].empty())
-                m_MeshToPrimitives[i] = std::move(meshPrimitives[i]);
+            ScopedTimer mapTimer("Build MeshToPrimitives Map");
+            for (size_t i = 0; i < meshPrimitives.size(); i++)
+            {
+                if (!meshPrimitives[i].empty())
+                    m_MeshToPrimitives[i] = std::move(meshPrimitives[i]);
+            }
         }
     }
 
     void GltfImporter::LoadTextures()
     {
+        ScopedTimer totalTexTimer("LoadTextures TOTAL");
+
         for (size_t i = 0; i < m_Model.textures.size(); i++)
         {
             const tinygltf::Texture& gltfTex = m_Model.textures[i];
+
+            if (gltfTex.source < 0 || gltfTex.source >= m_Model.images.size())
+            {
+                ISLE_ERROR("Texture %zu has invalid source index: %d\n", i, gltfTex.source);
+                continue;
+            }
+
             const tinygltf::Image& image = m_Model.images[gltfTex.source];
 
             unsigned char* data = nullptr;
@@ -333,20 +398,34 @@ namespace Isle
 
             if (image.uri.empty())
             {
-                // Embedded image
                 width = image.width;
                 height = image.height;
                 channels = image.component;
 
-                format = (channels == 3) ? TEXTURE_FORMAT::RGB8 : TEXTURE_FORMAT::RGBA8;
+                if (image.image.empty()) {
+                    ISLE_ERROR("Embedded texture %zu has no image data\n", i);
+                    continue;
+                }
 
-                size_t dataSize = width * height * channels;
+                if (image.bits == 8) {
+                    switch (channels) {
+                    case 1: format = TEXTURE_FORMAT::R8; break;
+                    case 2: format = TEXTURE_FORMAT::RG8; break;
+                    case 3: format = TEXTURE_FORMAT::RGB8; break;
+                    case 4: format = TEXTURE_FORMAT::RGBA8; break;
+                    default: format = TEXTURE_FORMAT::RGBA8; break;
+                    }
+                }
+                else {
+                    format = (channels == 3) ? TEXTURE_FORMAT::RGB8 : TEXTURE_FORMAT::RGBA8;
+                }
+
+                size_t dataSize = image.image.size();
                 data = new unsigned char[dataSize];
                 memcpy(data, image.image.data(), dataSize);
             }
             else
             {
-                // External image file
                 std::string texturePath = m_BasePath + image.uri;
                 stbi_set_flip_vertically_on_load(true);
                 data = stbi_load(texturePath.c_str(), &width, &height, &channels, 0);
@@ -367,11 +446,9 @@ namespace Isle
                 }
             }
 
-            // Create texture
             Texture* texture = new Texture();
             texture->Create(width, height, format, data, true);
 
-            // Set sampler settings
             TEXTURE_FILTER minFilter = TEXTURE_FILTER::LINEAR;
             TEXTURE_FILTER magFilter = TEXTURE_FILTER::LINEAR;
             TEXTURE_WRAP wrapS = TEXTURE_WRAP::REPEAT;
@@ -420,7 +497,6 @@ namespace Isle
 
             m_Textures[i] = texture;
 
-            // Free image data
             if (!image.uri.empty())
                 stbi_image_free(data);
             else
@@ -430,6 +506,8 @@ namespace Isle
 
     void GltfImporter::LoadMaterials()
     {
+        ScopedTimer totalMatTimer("LoadMaterials TOTAL");
+
         for (size_t i = 0; i < m_Model.materials.size(); i++)
         {
             const tinygltf::Material& gltf_mat = m_Model.materials[i];

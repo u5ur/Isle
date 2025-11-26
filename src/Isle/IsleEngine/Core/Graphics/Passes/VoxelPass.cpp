@@ -32,6 +32,20 @@ namespace Isle
         m_AtomicCounter->SetMinFilter(TEXTURE3D_FILTER::NEAREST);
         m_AtomicCounter->SetMagFilter(TEXTURE3D_FILTER::NEAREST);
 
+        m_IrradianceCache = New<Texture3D>();
+        m_IrradianceCache->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z,TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
+        m_IrradianceCache->SetMinFilter(TEXTURE3D_FILTER::LINEAR_MIPMAP_LINEAR);
+        m_IrradianceCache->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
+        m_IrradianceCache->SetWrap(TEXTURE3D_WRAP::CLAMP_TO_BORDER, TEXTURE3D_WRAP::CLAMP_TO_BORDER, TEXTURE3D_WRAP::CLAMP_TO_BORDER);
+        m_IrradianceCache->SetBorderColor(glm::vec4(0.0f));
+        m_IrradianceCache->Clear(glm::vec4(0.0f));
+
+        m_IrradiancePrev = New<Texture3D>();
+        m_IrradiancePrev->Create(m_Resolution.x, m_Resolution.y, m_Resolution.z, TEXTURE3D_FORMAT::RGBA16F, nullptr, true);
+        m_IrradiancePrev->SetMinFilter(TEXTURE3D_FILTER::LINEAR_MIPMAP_LINEAR);
+        m_IrradiancePrev->SetMagFilter(TEXTURE3D_FILTER::LINEAR);
+        m_IrradiancePrev->Clear(glm::vec4(0.0f));
+
         m_AtomicRadiance->Clear(glm::vec4(0.0f));
         m_AtomicCounter->Clear(glm::vec4(0.0f));
 
@@ -48,6 +62,14 @@ namespace Isle
         m_BuildShader = New<Shader>();
         m_BuildShader->LoadFromFile(SHADER_TYPE::COMPUTE, "Resources\\Shaders\\Voxel\\BuildVoxels.comp");
         m_BuildShader->Link();
+
+        m_InjectShader = New<Shader>();
+        m_InjectShader->LoadFromFile(SHADER_TYPE::COMPUTE, "Resources\\Shaders\\Voxel\\InjectIrradiance.comp");
+        m_InjectShader->Link();
+
+        m_PropagateShader = New<Shader>();
+        m_PropagateShader->LoadFromFile(SHADER_TYPE::COMPUTE, "Resources\\Shaders\\Voxel\\PropagateIrradiance.comp");
+        m_PropagateShader->Link();
 
         m_CellSize = glm::vec3((m_GridMax - m_GridMin)) / glm::vec3(m_Resolution);
         m_MipCount = static_cast<int>(glm::floor(glm::log2(static_cast<float>(m_Resolution.x)))) + 1;
@@ -106,10 +128,6 @@ namespace Isle
     {
         if (m_MipmapShader)
         {
-            glBindImageTexture(0, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA16F);
-            glBindImageTexture(1, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-            glBindImageTexture(2, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32UI);
-
             m_MipmapShader->Bind();
 
             for (int mip = 1; mip < m_MaxMipLevel; mip++)
@@ -121,6 +139,8 @@ namespace Isle
                 m_VoxelNormal->BindAsImage(1, GL_WRITE_ONLY, mip);
                 m_VoxelRadiance->BindAsImage(2, GL_READ_ONLY, mip - 1);
                 m_VoxelNormal->BindAsImage(3, GL_READ_ONLY, mip - 1);
+                m_IrradianceCache->BindAsImage(4, GL_WRITE_ONLY, mip);
+                m_IrradianceCache->BindAsImage(5, GL_READ_ONLY, mip - 1);
 
                 m_MipmapShader->SetInt("u_MipLevel", mip);
                 m_MipmapShader->SetIVec3("u_RegionMin", glm::ivec3(0));
@@ -129,9 +149,10 @@ namespace Isle
                 glm::ivec3 groupCount = (mipRes + glm::ivec3(3)) / glm::ivec3(4);
                 glDispatchCompute(groupCount.x, groupCount.y, groupCount.z);
 
-                if (mip < m_MaxMipLevel - 1)
-                    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
+
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
         }
     }
 
@@ -156,6 +177,46 @@ namespace Isle
 
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
+    }
+
+    void VoxelPass::InjectDirectLighting()
+    {
+        m_InjectShader->Bind();
+
+        m_VoxelRadiance->BindAsImage(0, GL_READ_ONLY, 0);
+        m_VoxelNormal->BindAsImage(1, GL_READ_ONLY, 0);
+        m_IrradiancePrev->BindAsImage(2, GL_READ_ONLY, 0);
+        m_IrradianceCache->BindAsImage(3, GL_WRITE_ONLY, 0);
+
+        m_InjectShader->SetIVec3("u_Resolution", m_Resolution);
+        m_InjectShader->SetInt("u_Frame", m_CurrentFrame);
+
+        glm::ivec3 groupCount = (m_Resolution + glm::ivec3(7)) / glm::ivec3(8);
+        glDispatchCompute(groupCount.x, groupCount.y, groupCount.z);
+
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    }
+
+    void VoxelPass::PropagateIrradiance()
+    {
+        m_PropagateShader->Bind();
+
+        m_IrradianceCache->BindAsImage(0, GL_READ_ONLY, 0);
+        m_VoxelNormal->BindAsImage(1, GL_READ_ONLY, 0);
+        m_VoxelRadiance->BindAsImage(2, GL_READ_ONLY, 0);
+        m_IrradiancePrev->BindAsImage(3, GL_WRITE_ONLY, 0);
+
+        m_PropagateShader->SetIVec3("u_Resolution", m_Resolution);
+        m_PropagateShader->SetIVec3("u_GridMin", m_GridMin);
+        m_PropagateShader->SetIVec3("u_GridMax", m_GridMax);
+        m_PropagateShader->SetVec3("u_CellSize", m_CellSize);
+
+        glm::ivec3 groupCount = (m_Resolution + glm::ivec3(7)) / glm::ivec3(8);
+        glDispatchCompute(groupCount.x, groupCount.y, groupCount.z);
+
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
+        std::swap(m_IrradianceCache, m_IrradiancePrev);
     }
 
     void VoxelPass::SetupViewport()

@@ -12,10 +12,9 @@ namespace Isle
     {
         Scene::Instance()->Add(MainCamera::Instance());
         Scene::Instance()->Add(World::Instance());
-
         Engine::Instance()->Start();
     }
-
+        
     void GameApplication::Update()
     {
         Engine::Instance()->Update();
@@ -31,3 +30,5 @@ namespace Isle
 {
     static GameApplication g_GameApplication;
 }
+
+

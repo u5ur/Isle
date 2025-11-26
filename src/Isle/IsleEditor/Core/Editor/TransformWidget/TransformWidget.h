@@ -36,20 +36,24 @@ namespace Isle
         SceneComponent* comp = selectedComponents[0];
 
         auto camera = MainCamera::Instance()->GetCamera();
-        if (!camera) return;
+        if (!camera) 
+            return;
 
         glm::mat4 view = camera->m_ViewMatrix;
         glm::mat4 proj = camera->m_ProjectionMatrix;
 
         auto viewport = editor->m_Viewport;
-        if (!viewport) return;
+        if (!viewport) 
+            return;
 
         ImVec2 vpPos = viewport->GetPosition();
         ImVec2 vpSize = viewport->GetSize();
-        if (vpSize.x <= 0.0f || vpSize.y <= 0.0f) return;
+        if (vpSize.x <= 0.0f || vpSize.y <= 0.0f) 
+            return;
 
         auto tex = viewport->GetViewportTexture();
-        if (!tex) return;
+        if (!tex) 
+            return;
 
         float texAspect = (float)tex->m_Width / (float)tex->m_Height;
         float winAspect = vpSize.x / vpSize.y;

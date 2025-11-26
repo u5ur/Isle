@@ -147,6 +147,7 @@ namespace Isle
         {
             Editor::Instance()->SetViewportTexture(nullptr);
             Application::Instance()->Destroy();
+            Application::s_Instance = nullptr;
         }
     }
 

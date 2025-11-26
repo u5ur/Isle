@@ -1,0 +1,109 @@
+#version 460 core
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout(binding = 0, rgba16f) uniform readonly image3D u_IrradianceIn;
+layout(binding = 1, rgba16f) uniform readonly image3D u_VoxelNormal;
+layout(binding = 2, rgba16f) uniform readonly image3D u_VoxelRadiance;
+layout(binding = 3, rgba16f) uniform writeonly image3D u_IrradianceOut;
+
+uniform ivec3 u_Resolution;
+uniform ivec3 u_GridMin;
+uniform ivec3 u_GridMax;
+uniform vec3 u_CellSize;
+
+const ivec3 SAMPLE_OFFSETS[6] = ivec3[6](
+    ivec3(1, 0, 0),
+    ivec3(-1, 0, 0),
+    ivec3(0, 1, 0),
+    ivec3(0, -1, 0),
+    ivec3(0, 0, 1),
+    ivec3(0, 0, -1)
+);
+
+const vec3 SAMPLE_NORMALS[6] = vec3[6](
+    vec3(1, 0, 0),
+    vec3(-1, 0, 0),
+    vec3(0, 1, 0),
+    vec3(0, -1, 0),
+    vec3(0, 0, 1),
+    vec3(0, 0, -1)
+);
+
+void main()
+{
+    ivec3 voxelCoord = ivec3(gl_GlobalInvocationID);
+    
+    if (any(greaterThanEqual(voxelCoord, u_Resolution)))
+        return;
+    
+    vec4 currentRadiance = imageLoad(u_VoxelRadiance, voxelCoord);
+    vec4 currentIrradiance = imageLoad(u_IrradianceIn, voxelCoord);
+    
+    bool isSolidVoxel = currentRadiance.a > 0.01;
+    
+    vec3 incomingIrradiance = vec3(0.0);
+    float totalWeight = 0.0;
+    int validSamples = 0;
+    
+    for (int i = 0; i < 6; i++)
+    {
+        ivec3 neighborCoord = voxelCoord + SAMPLE_OFFSETS[i];
+        
+        if (any(lessThan(neighborCoord, ivec3(0))) || 
+            any(greaterThanEqual(neighborCoord, u_Resolution)))
+            continue;
+        
+        vec4 neighborIrradiance = imageLoad(u_IrradianceIn, neighborCoord);
+        vec4 neighborRadiance = imageLoad(u_VoxelRadiance, neighborCoord);
+        
+        if (neighborIrradiance.a > 0.01)
+        {
+            vec3 dirToNeighbor = SAMPLE_NORMALS[i];
+            float weight = 1.0;
+            
+            if (isSolidVoxel)
+            {
+                vec4 normalData = imageLoad(u_VoxelNormal, voxelCoord);
+                vec3 surfaceNormal = normalize(normalData.rgb * 2.0 - 1.0);
+                float NdotL = max(dot(surfaceNormal, dirToNeighbor), 0.0);
+                weight = NdotL;
+            }
+            
+            if (weight > 0.01)
+            {
+                incomingIrradiance += neighborIrradiance.rgb * weight;
+                totalWeight += weight;
+                validSamples++;
+            }
+        }
+    }
+    
+    vec3 propagatedLight = vec3(0.0);
+    if (totalWeight > 0.0 && validSamples > 0)
+    {
+        propagatedLight = (incomingIrradiance / totalWeight) * 0.8;
+    }
+    
+    vec3 finalIrradiance;
+    float finalAlpha;
+    
+    if (isSolidVoxel)
+    {
+        finalIrradiance = mix(currentIrradiance.rgb, propagatedLight, 0.4);
+        finalAlpha = max(currentIrradiance.a, 0.5);
+    }
+    else
+    {
+        finalIrradiance = propagatedLight;
+        finalAlpha = max(currentIrradiance.a * 0.98, 0.1);
+    }
+    
+    if (!isSolidVoxel && length(propagatedLight) < 0.001)
+    {
+        finalIrradiance = currentIrradiance.rgb * 0.95;
+        finalAlpha = currentIrradiance.a * 0.95;
+    }
+    
+    imageStore(u_IrradianceOut, voxelCoord, vec4(finalIrradiance, finalAlpha));
+}

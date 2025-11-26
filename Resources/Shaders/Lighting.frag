@@ -13,6 +13,7 @@ uniform sampler2D u_GNormal;
 uniform sampler2D u_GPosition;
 uniform sampler2D u_GMaterial;
 uniform sampler2D u_ShadowMap;
+uniform sampler2D u_DepthBuffer;
 
 #define SHADOW_SAMPLES 16
 #define LIGHT_TYPE_DIRECTIONAL 0
@@ -200,21 +201,40 @@ void main()
     vec3 normal = texture(u_GNormal, TexCoord).xyz;
     vec3 worldPos = texture(u_GPosition, TexCoord).xyz;
     vec4 material = texture(u_GMaterial, TexCoord);
+
+    float depth = texture(u_DepthBuffer, TexCoord).r;
+    
+    if (depth >= 0.9999) {
+        discard;
+    }
+    
+    vec3 N = normalize(normal * 2.0 - 1.0);
+    vec3 V = normalize(camera.m_Position - worldPos);
     
     float metallic = material.r;
     float roughness = material.g;
     float ao = material.b;
     float emissive = material.a;
     
-    vec3 N = normalize(normal);
-    vec3 V = normalize(camera.m_Position - worldPos);
-    
-    vec3 Lo = vec3(0.0);   
-    //Lo += albedoTex.rgb;
+    vec3 Lo = vec3(0.0);
     
     for (int i = 0; i < lights.length(); i++)
     {
         GpuLight light = lights[i];
+        
+        vec3 lightDir;
+        if (light.m_Type == LIGHT_TYPE_DIRECTIONAL) {
+            lightDir = normalize(-light.m_Direction);
+        } else if (light.m_Type == LIGHT_TYPE_POINT) {
+            lightDir = normalize(light.m_Position - worldPos);
+        } else if (light.m_Type == LIGHT_TYPE_SPOT) {
+            lightDir = normalize(light.m_Position - worldPos);
+        }
+        
+        float NdotL = dot(N, lightDir);
+        if (NdotL <= 0.0) {
+            continue;
+        }
         
         if (light.m_Type == LIGHT_TYPE_DIRECTIONAL)
         {

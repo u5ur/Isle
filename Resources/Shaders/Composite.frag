@@ -19,6 +19,7 @@ uniform sampler2D u_DepthBuffer;
 
 uniform sampler3D u_VoxelRadiance;
 uniform sampler3D u_VoxelNormal;
+uniform sampler3D u_IrradianceCache;
 
 uniform ivec3 u_Resolution;
 uniform ivec3 u_GridMin;
@@ -37,21 +38,9 @@ uniform float u_IndirectStrength = 1.0;
 uniform float u_SpecularStrength = 1.0;
 uniform float u_MaxDistance = 50.0;
 
-uniform int u_SSR_MaxSteps = 128;
-uniform int u_SSR_BinarySteps = 8;
-uniform float u_SSR_StepSize = 0.5;
-uniform float u_SSR_MaxRayDistance = 100.0;
-uniform float u_SSR_DepthThickness = 0.5;
-uniform float u_SSR_EdgeFadeStart = 0.8;
-uniform float u_SSR_EdgeFadeEnd = 0.95;
-
 uniform vec3 u_OutlineColor = vec3(1.0, 0.6, 0.0);
 
 const float CONE_TRACE_MIN_DIAMETER = 0.5;
-const float AO_BIAS = 0.1;
-const float SPECULAR_EARLY_OUT_THRESHOLD = 0.95;
-const float DIFFUSE_EARLY_OUT_THRESHOLD = 0.90;
-
 
 vec3 WorldToVoxelUVW(vec3 worldPos)
 {
@@ -64,6 +53,14 @@ vec4 SampleVoxelRadianceSafe(vec3 worldPos, float lod)
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
         return vec4(0.0);
     return textureLod(u_VoxelRadiance, uvw, lod);
+}
+
+vec4 SampleIrradianceSafe(vec3 worldPos, float lod)
+{
+    vec3 uvw = WorldToVoxelUVW(worldPos);
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
+        return vec4(0.0);
+    return textureLod(u_IrradianceCache, uvw, lod);
 }
 
 void BuildTangentBasis(vec3 normal, out vec3 tangent, out vec3 bitangent)
@@ -112,12 +109,14 @@ vec3 TraceSpecularCone(vec3 origin, vec3 direction, float roughness, float maxDi
         lod = clamp(lod, 0.0, float(u_MipCount - 1));
         
         vec3 samplePos = origin + direction * dist;
-        vec4 voxelSample = SampleVoxelRadianceSafe(samplePos, lod);
         
-        if (voxelSample.a > 0.001)
+        vec4 irradianceSample = SampleIrradianceSafe(samplePos, lod);
+        vec4 geometrySample = SampleVoxelRadianceSafe(samplePos, lod);
+        
+        if (geometrySample.a > 0.001)
         {
-            float weight = voxelSample.a * (1.0 - alpha);
-            radiance += voxelSample.rgb * weight;
+            float weight = geometrySample.a * (1.0 - alpha);
+            radiance += irradianceSample.rgb * weight;
             alpha += weight;
         }
         
@@ -134,12 +133,10 @@ vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
     BuildTangentBasis(normal, tangent, bitangent);
     
     vec3 gi = vec3(0.0);
-    float totalWeight = 0.0;
     float maxDist = u_MaxDistance * 0.4;
     float minVoxelDiameter = u_CellSize.x * CONE_TRACE_MIN_DIAMETER;
     float coneRatio = mix(0.35, 0.75, roughness);
     
-    // Main cone
     {
         vec3 radiance = vec3(0.0);
         float coneWeight = 0.0;
@@ -153,15 +150,20 @@ vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
             float coneDiameter = max(2.0 * coneRatio * dist, minVoxelDiameter);
             float lod = clamp(log2(coneDiameter / u_CellSize.x), 0.0, float(u_MipCount - 1));
             
-            vec4 sample2 = SampleVoxelRadianceSafe(position + normal * dist, lod);
+            vec3 samplePos = position + normal * dist;
             
-            if (sample2.a > 0.01)
+            vec4 irradianceSample = SampleIrradianceSafe(samplePos, lod);
+            vec4 geometrySample = SampleVoxelRadianceSafe(samplePos, lod);
+            
+            if (geometrySample.a > 0.01 || irradianceSample.a > 0.1)
             {
-                float falloff = 1.0 / (1.0 + 0.05 * dist);
-                float weight = sample2.a * (1.0 - min(occlusion, 0.98)) * falloff;
-                radiance += sample2.rgb * weight;
+                float falloff = 1.0 / (1.0 + 0.02 * dist);
+                float weight = max(geometrySample.a, irradianceSample.a * 0.5) * (1.0 - min(occlusion, 0.95)) * falloff;
+    
+                vec3 sampleValue = irradianceSample.a > 0.1 ? irradianceSample.rgb : geometrySample.rgb;
+                radiance += sampleValue * weight;
                 coneWeight += weight;
-                occlusion += sample2.a * (1.0 - min(occlusion, 0.98)) * 0.35;
+                occlusion += geometrySample.a * (1.0 - min(occlusion, 0.95)) * 0.25;
             }
             
             dist += coneDiameter * 1.2;
@@ -171,10 +173,8 @@ vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
             radiance /= coneWeight;
         
         gi += radiance * 0.3;
-        totalWeight += 0.3;
     }
     
-    // Side cones
     for (int i = 0; i < 4; i++)
     {
         float angle = float(i) * 1.5708;
@@ -193,15 +193,18 @@ vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
             float coneDiameter = max(2.0 * coneRatio * dist, minVoxelDiameter);
             float lod = clamp(log2(coneDiameter / u_CellSize.x) + 0.5, 0.0, float(u_MipCount - 1));
             
-            vec4 sample2 = SampleVoxelRadianceSafe(position + coneDir * dist, lod);
+            vec3 samplePos = position + coneDir * dist;
             
-            if (sample2.a > 0.01)
+            vec4 irradianceSample = SampleIrradianceSafe(samplePos, lod);
+            vec4 geometrySample = SampleVoxelRadianceSafe(samplePos, lod);
+            
+            if (geometrySample.a > 0.01)
             {
                 float falloff = 1.0 / (1.0 + 0.05 * dist);
-                float weight = sample2.a * (1.0 - min(occlusion, 0.98)) * falloff;
-                radiance += sample2.rgb * weight;
+                float weight = geometrySample.a * (1.0 - min(occlusion, 0.98)) * falloff;
+                radiance += irradianceSample.rgb * weight;
                 coneWeight += weight;
-                occlusion += sample2.a * (1.0 - min(occlusion, 0.98)) * 0.3;
+                occlusion += geometrySample.a * (1.0 - min(occlusion, 0.98)) * 0.3;
             }
             
             dist += coneDiameter * 1.3;
@@ -211,7 +214,6 @@ vec3 ComputeIndirectDiffuse(vec3 position, vec3 normal, float roughness)
             radiance /= coneWeight;
         
         gi += radiance * 0.175;
-        totalWeight += 0.175;
     }
     
     return gi * u_IndirectStrength;

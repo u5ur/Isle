@@ -8,7 +8,7 @@ namespace Isle
     template<>
     class ISLEENGINE_API Singleton<Application>
     {
-    private:
+    public:
         static Application* s_Instance;
         static bool s_IsValid;
 

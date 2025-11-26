@@ -29,6 +29,7 @@ namespace Isle
         m_PipelineState->SetDepthWrite(false);
         m_PipelineState->SetBlendEnabled(false);
         m_PipelineState->SetCullEnabled(false);
+
     }
 
     void LightingPass::Update()

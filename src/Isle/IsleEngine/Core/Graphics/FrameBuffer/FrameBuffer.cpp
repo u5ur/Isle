@@ -311,6 +311,25 @@ namespace Isle
         glDeleteFramebuffers(1, &tempFBO);
     }
 
+    void FrameBuffer::BlitDepthTo(FrameBuffer* target)
+    {
+        GLuint targetId = target ? target->m_Id : 0;
+        int targetWidth = target ? target->m_Width : m_Width;
+        int targetHeight = target ? target->m_Height : m_Height;
+
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, m_Id);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, targetId);
+
+        glBlitFramebuffer(
+            0, 0, m_Width, m_Height,
+            0, 0, targetWidth, targetHeight,
+            GL_DEPTH_BUFFER_BIT,
+            GL_NEAREST
+        );
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
     void FrameBuffer::SetDebugLabel(const std::string& name)
     {
         if (glObjectLabel)

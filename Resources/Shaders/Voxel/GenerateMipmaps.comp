@@ -1,11 +1,12 @@
-// GenerateMipmaps.comp
 #version 460
 layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(binding = 0, rgba16f) uniform image3D u_RadianceOut;
-layout(binding = 1, rgba16f) uniform image3D u_NormalOut;
-layout(binding = 2, rgba16f) uniform image3D u_RadianceIn;
-layout(binding = 3, rgba16f) uniform image3D u_NormalIn;
+layout(binding = 0, rgba16f) uniform writeonly image3D u_RadianceOut;
+layout(binding = 1, rgba16f) uniform writeonly image3D u_NormalOut;
+layout(binding = 2, rgba16f) uniform readonly image3D u_RadianceIn;
+layout(binding = 3, rgba16f) uniform readonly image3D u_NormalIn;
+layout(binding = 4, rgba16f) uniform writeonly image3D u_IrradianceOut;
+layout(binding = 5, rgba16f) uniform readonly image3D u_IrradianceIn;
 
 uniform int u_MipLevel;
 uniform ivec3 u_RegionMin;
@@ -23,7 +24,9 @@ void main()
     vec4 radianceAccum = vec4(0.0);
     vec3 normalAccum = vec3(0.0);
     float totalWeight = 0.0;
-    float maxAlpha = 0.0;
+    float maxAlpha = 0.0;    
+    vec4 irradianceAccum = vec4(0.0);
+    float irradianceTotalWeight = 0.0;
     
     #define SAMPLE_VOXEL(ox, oy, oz) \
     { \
@@ -31,12 +34,18 @@ void main()
         if (all(lessThan(pos, inputSize))) { \
             vec4 rad = imageLoad(u_RadianceIn, pos); \
             vec4 normData = imageLoad(u_NormalIn, pos); \
+            vec4 irrad = imageLoad(u_IrradianceIn, pos); \
             float weight = rad.a; \
             if (weight > 0.0) { \
                 radianceAccum.rgb += rad.rgb * weight; \
                 normalAccum += normData.rgb * weight; \
                 totalWeight += weight; \
                 maxAlpha = max(maxAlpha, weight); \
+            } \
+            float irradWeight = irrad.a; \
+            if (irradWeight > 0.0) { \
+                irradianceAccum.rgb += irrad.rgb * irradWeight; \
+                irradianceTotalWeight += irradWeight; \
             } \
         } \
     }
@@ -64,5 +73,16 @@ void main()
     {
         imageStore(u_RadianceOut, outVoxel, vec4(0.0));
         imageStore(u_NormalOut, outVoxel, vec4(0.0, 0.0, 1.0, 0.0));
+    }
+    
+    if (irradianceTotalWeight > 0.0)
+    {
+        vec3 irradianceResult = irradianceAccum.rgb / irradianceTotalWeight;
+        float irradianceAlpha = irradianceTotalWeight > 0.0 ? (irradianceTotalWeight / 8.0) : 0.0;
+        imageStore(u_IrradianceOut, outVoxel, vec4(irradianceResult, irradianceAlpha));
+    }
+    else
+    {
+        imageStore(u_IrradianceOut, outVoxel, vec4(0.0));
     }
 }

@@ -66,6 +66,8 @@ namespace Isle
         void BlitTo(FrameBuffer* target, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
         void BlitTo(FrameBuffer* target, const glm::ivec4& srcRect, const glm::ivec4& destRect, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
         void BlitToTexture(Ref<Texture> targetTexture, GLbitfield mask = GL_COLOR_BUFFER_BIT, GLenum filter = GL_NEAREST);
+        void BlitDepthTo(FrameBuffer* target);
+
         void SetDebugLabel(const std::string& name);
         void SetViewport();
 

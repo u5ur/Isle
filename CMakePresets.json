@@ -19,34 +19,34 @@
     },
 
     {
-      "name": "x64-debug",
-      "displayName": "x64 Debug",
+      "name": "debug",
+      "displayName": "debug",
       "inherits": "windows-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "debug"
       }
     },
 
     {
-      "name": "x64-release",
-      "displayName": "x64 Release",
+      "name": "release",
+      "displayName": "release",
       "inherits": "windows-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "release"
       }
     }
   ],
 
   "buildPresets": [
     {
-      "name": "build-debug",
-      "configurePreset": "x64-debug",
-      "configuration": "Debug"
+      "name": "debug",
+      "configurePreset": "debug",
+      "configuration": "debug"
     },
     {
-      "name": "build-release",
-      "configurePreset": "x64-release",
-      "configuration": "Release"
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "release"
     }
   ]
 }
