@@ -4,8 +4,7 @@ IsleEngine is developed primarily for personal use. While its source code is pub
 
 ## Building
 
-**Prerequisites**
-- CMake (3.15 or higher)
+- CMake (3.16 or higher)
 - MSVC via Visual Studio
 
 ```bash
