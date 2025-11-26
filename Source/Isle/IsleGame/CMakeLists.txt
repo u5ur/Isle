@@ -11,7 +11,7 @@ target_compile_definitions(IsleGame PRIVATE ISLEGAME_EXPORTS)
 
 target_include_directories(IsleGame PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_SOURCE_DIR}/src/Isle/IsleEngine"
+    "${CMAKE_SOURCE_DIR}/Source/Isle/IsleEngine"
     ${THIRDPARTY_INCLUDES}
 )
 

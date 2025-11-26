@@ -13,7 +13,7 @@ endif()
 
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS GLEW_STATIC IMGUI_DEFINE_MATH_OPERATORS)
 
-set(THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/src/ThirdParty")
+set(THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/Source/ThirdParty")
 
 file(GLOB_RECURSE ALL_THIRDPARTY_ITEMS "${THIRDPARTY_DIR}/*")
 set(THIRDPARTY_INCLUDES "")
@@ -41,7 +41,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
-add_subdirectory(src/Isle/IsleEngine)
-add_subdirectory(src/Isle/IsleGame)
-add_subdirectory(src/Isle/IsleEditor)
+add_subdirectory(Source/Isle/IsleEngine)
+add_subdirectory(Source/Isle/IsleGame)
+add_subdirectory(Source/Isle/IsleEditor)
 add_dependencies(IsleEditor IsleGame)
