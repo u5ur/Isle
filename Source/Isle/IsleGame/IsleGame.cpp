@@ -10,6 +10,7 @@ namespace Isle
 
     void GameApplication::Start()
     {
+        Scene::Instance()->Add(new CubeMesh());
         Scene::Instance()->Add(MainCamera::Instance());
         Scene::Instance()->Add(World::Instance());
         Engine::Instance()->Start();
